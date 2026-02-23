@@ -7,6 +7,8 @@ import (
 	"github.com/ErlanBelekov/dist-job-scheduler/config"
 	"github.com/ErlanBelekov/dist-job-scheduler/internal/infrastructure/postgres"
 	httptransport "github.com/ErlanBelekov/dist-job-scheduler/internal/transport/http"
+	"github.com/ErlanBelekov/dist-job-scheduler/internal/transport/http/handler"
+	"github.com/ErlanBelekov/dist-job-scheduler/internal/usecase"
 )
 
 func main() {
@@ -25,6 +27,10 @@ func main() {
 
 	log.Println("db connected")
 
-	r := httptransport.NewRouter()
+	jobRepo := postgres.NewJobRepository(pool)
+	jobUsecase := usecase.NewJobUsecase(jobRepo)
+	jobHandler := handler.NewJobHandler(jobUsecase)
+
+	r := httptransport.NewRouter(jobHandler)
 	r.Run(":" + cfg.Port)
 }

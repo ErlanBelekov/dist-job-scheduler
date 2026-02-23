@@ -1,13 +1,14 @@
 package repository
 
-import "context"
+import (
+	"context"
 
-// This code should abstract away access to DB for Job domain
-// Cancelation via context, transaction inside
+	"github.com/ErlanBelekov/dist-job-scheduler/internal/domain"
+)
 
-type JobRepository struct {
-}
-
-func (jr *JobRepository) Create(ctx context.Context) {
-
+// UseCase depends on interface, not concrete implementation.
+// This way we get: 1) can swap DB later without touching usecase 2) We can pass a mock implementation of interface in tests
+type JobRepository interface {
+	Create(ctx context.Context, job *domain.Job) (*domain.Job, error)
+	GetByID(ctx context.Context, id string) (*domain.Job, error)
 }

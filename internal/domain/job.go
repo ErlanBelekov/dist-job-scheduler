@@ -17,7 +17,7 @@ const (
 type Backoff string
 
 const (
-	BackoffExponential Backoff = "exponentional"
+	BackoffExponential Backoff = "exponential"
 	BackoffLinear      Backoff = "linear"
 )
 
@@ -44,9 +44,10 @@ type Job struct {
 	LastError   *string
 
 	CreatedAt time.Time // when the Job was created
+	UpdatedAt time.Time
 }
 
-type JobExecution struct {
+type JobAttempt struct {
 	ID          string
 	JobID       string
 	AttemptNum  int
