@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"log"
 	"net/http"
 	"time"
 
@@ -48,6 +49,7 @@ func (h *JobHandler) Create(ctx *gin.Context) {
 		Backoff:        req.Backoff,
 	})
 	if err != nil {
+		log.Printf("create job error: %v", err)
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
 		return
 	}

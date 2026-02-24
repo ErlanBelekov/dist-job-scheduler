@@ -30,6 +30,20 @@ type CreateJobInput struct {
 }
 
 func (u *JobUsecase) CreateJob(ctx context.Context, input CreateJobInput) (*domain.Job, error) {
+	if input.Headers == nil {
+		input.Headers = make(map[string]string)
+	}
+
+	if input.TimeoutSeconds == 0 {
+		input.TimeoutSeconds = 30
+	}
+	if input.MaxRetries == 0 {
+		input.MaxRetries = 3
+	}
+	if input.Backoff == "" {
+		input.Backoff = domain.BackoffExponential
+	}
+
 	job := &domain.Job{
 		IdempotencyKey: input.IdempotencyKey,
 		URL:            input.URL,

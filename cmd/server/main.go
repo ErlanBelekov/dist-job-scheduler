@@ -3,9 +3,14 @@ package main
 import (
 	"context"
 	"log"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"github.com/ErlanBelekov/dist-job-scheduler/config"
 	"github.com/ErlanBelekov/dist-job-scheduler/internal/infrastructure/postgres"
+	"github.com/ErlanBelekov/dist-job-scheduler/internal/scheduler"
 	httptransport "github.com/ErlanBelekov/dist-job-scheduler/internal/transport/http"
 	"github.com/ErlanBelekov/dist-job-scheduler/internal/transport/http/handler"
 	"github.com/ErlanBelekov/dist-job-scheduler/internal/usecase"
@@ -17,7 +22,8 @@ func main() {
 		log.Fatalf("config error: %v", err)
 	}
 
-	ctx := context.Background()
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
 
 	pool, err := postgres.NewPool(ctx, cfg.DatabaseURL)
 	if err != nil {
@@ -25,11 +31,17 @@ func main() {
 	}
 	defer pool.Close()
 
-	log.Println("db connected")
-
 	jobRepo := postgres.NewJobRepository(pool)
 	jobUsecase := usecase.NewJobUsecase(jobRepo)
 	jobHandler := handler.NewJobHandler(jobUsecase)
+
+	// start worker in background
+	worker := scheduler.NewWorker(
+		jobRepo,
+		time.Duration(cfg.PollIntervalSec)*time.Second,
+		cfg.WorkerCount,
+	)
+	go worker.Start(ctx)
 
 	r := httptransport.NewRouter(jobHandler)
 	r.Run(":" + cfg.Port)

@@ -3,9 +3,9 @@ package postgres
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/ErlanBelekov/dist-job-scheduler/internal/domain"
-	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -56,8 +56,89 @@ func (r *JobRepository) GetByID(ctx context.Context, id string) (*domain.Job, er
 	return scanJob(row)
 }
 
+func (r *JobRepository) Claim(ctx context.Context, workerID string, limit int) ([]*domain.Job, error) {
+	// This is the core logic of scheduler to prevent double execution of a job
+	// FOR UPDATE SKIP LOCKED will skip rows locked by other processes
+	query := `
+                UPDATE jobs
+                SET    status       = 'running',
+                       claimed_at   = NOW(),
+                       claimed_by   = $1,
+                       heartbeat_at = NOW(),
+                       updated_at   = NOW()
+                WHERE id IN (
+                        SELECT id FROM jobs
+                        WHERE  status       = 'pending'
+                          AND  scheduled_at <= NOW()
+                        ORDER BY scheduled_at ASC
+                        LIMIT $2
+                        FOR UPDATE SKIP LOCKED
+                )
+                RETURNING id, idempotency_key, url, method, headers, body,
+                          timeout_seconds, status, scheduled_at, retry_count,
+                          max_retries, backoff, claimed_at, claimed_by,
+                          heartbeat_at, completed_at, last_error, created_at, updated_at`
+	rows, err := r.pool.Query(ctx, query, workerID, limit)
+	if err != nil {
+		return nil, fmt.Errorf("claim jobs: %w", err)
+	}
+	defer rows.Close()
+
+	var jobs []*domain.Job
+	for rows.Next() {
+		j, err := scanJob(rows)
+		if err != nil {
+			return nil, err
+		}
+		jobs = append(jobs, j)
+	}
+	return jobs, nil
+}
+
+func (r *JobRepository) UpdateHeartbeat(ctx context.Context, jobID string) error {
+	_, err := r.pool.Exec(ctx,
+		`UPDATE jobs SET heartbeat_at = NOW(), updated_at = NOW() 
+		WHERE id = $1 AND status = 'running'`, jobID)
+	return err
+}
+
+func (r *JobRepository) Complete(ctx context.Context, jobID string) error {
+	_, err := r.pool.Exec(ctx,
+		`UPDATE jobs SET status = 'completed', completed_at = NOW(), updated_at = NOW()
+                 WHERE id = $1`, jobID)
+	return err
+}
+
+func (r *JobRepository) Fail(ctx context.Context, jobID string, lastError string) error {
+	_, err := r.pool.Exec(ctx,
+		`UPDATE jobs SET status = 'failed', last_error = $2, updated_at = NOW()
+                 WHERE id = $1`, jobID, lastError)
+	return err
+}
+
+func (r *JobRepository) Reschedule(ctx context.Context, jobID string, lastError string, retryAt time.Time) error {
+	// make sure that retry_count is not over-incremented due to multiple workers trying to re-schedule same jobs
+	_, err := r.pool.Exec(ctx,
+		`UPDATE jobs
+                 SET    status       = 'pending',
+                        retry_count  = retry_count + 1,
+                        last_error   = $2,
+                        scheduled_at = $3,
+                        claimed_at   = NULL,
+                        claimed_by   = NULL,
+                        heartbeat_at = NULL,
+                        updated_at   = NOW()
+                 WHERE id = $1`, jobID, lastError, retryAt)
+	return err
+}
+
+// pgx.Row and pgx.Rows both implement this
+type rowScanner interface {
+	Scan(dest ...any) error
+}
+
 // scanJob is a private helper — avoids repeating Scan calls across multiple queries
-func scanJob(row pgx.Row) (*domain.Job, error) {
+func scanJob(row rowScanner) (*domain.Job, error) {
 	var j domain.Job
 	err := row.Scan(
 		&j.ID, &j.IdempotencyKey, &j.URL, &j.Method, &j.Headers, &j.Body,
