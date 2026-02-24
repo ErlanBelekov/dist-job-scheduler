@@ -45,6 +45,7 @@ func (w *Worker) Start(ctx context.Context) {
 		select {
 		case <-ctx.Done():
 			log.Printf("worker %s: shut down", w.id)
+			return
 		case <-ticker.C:
 			w.processBatch(ctx)
 		}
@@ -54,7 +55,7 @@ func (w *Worker) Start(ctx context.Context) {
 func (w *Worker) processBatch(ctx context.Context) {
 	jobs, err := w.repo.Claim(ctx, w.id, w.concurrency)
 	if err != nil {
-		log.Printf("worker: claim error: %w", err)
+		log.Printf("worker: claim error: %v", err)
 		return
 	}
 
@@ -89,7 +90,7 @@ func (w *Worker) runJob(ctx context.Context, job *domain.Job) {
 
 	if result.Err == nil && result.StatusCode == http.StatusOK {
 		if err := w.repo.Complete(ctx, job.ID); err != nil {
-			log.Printf("worker %s: complete job failed %s: %w", w.id, job.ID, err)
+			log.Printf("worker %s: complete job failed %s: %v", w.id, job.ID, err)
 		}
 		log.Printf("worker %s: job %s completed in %s", w.id, job.ID, result.Duration)
 		return
@@ -107,7 +108,7 @@ func (w *Worker) runJob(ctx context.Context, job *domain.Job) {
 	if job.RetryCount < job.MaxRetries {
 		retryAt := time.Now().Add(retryDelay(job.Backoff, job.RetryCount))
 		if err := w.repo.Reschedule(ctx, job.ID, errMsg, retryAt); err != nil {
-			log.Printf("worker %s: reschedule job %s: error %w", w.id, job.ID, err)
+			log.Printf("worker %s: reschedule job %s: error %v", w.id, job.ID, err)
 		}
 		log.Printf("worker %s: job %s failed, retry %d/%d at %s", w.id, job.ID, job.RetryCount+1, job.MaxRetries, retryAt)
 	} else {
@@ -128,7 +129,7 @@ func (w *Worker) heartbeat(ctx context.Context, jobID string) {
 		case <-ticker.C:
 			log.Printf("worker %s: heartbeat update", w.id)
 			if err := w.repo.UpdateHeartbeat(ctx, jobID); err != nil {
-				log.Printf("worker %s: heartbeat failed %w", err)
+				log.Printf("worker %s: heartbeat failed %v", err)
 			}
 		}
 	}
