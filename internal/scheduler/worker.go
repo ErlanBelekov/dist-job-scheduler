@@ -8,7 +8,6 @@ import (
 	"math/rand"
 	"net/http"
 	"os"
-	"sync"
 	"time"
 
 	"github.com/ErlanBelekov/dist-job-scheduler/internal/domain"
@@ -21,6 +20,7 @@ type Worker struct {
 	executor     *Executor
 	pollInterval time.Duration
 	concurrency  int
+	sem          chan struct{}
 }
 
 func NewWorker(repo repository.JobRepository, pollInterval time.Duration, concurrency int) *Worker {
@@ -31,6 +31,7 @@ func NewWorker(repo repository.JobRepository, pollInterval time.Duration, concur
 		executor:     NewExecutor(),
 		pollInterval: pollInterval,
 		concurrency:  concurrency,
+		sem:          make(chan struct{}, concurrency),
 	}
 }
 
@@ -53,7 +54,13 @@ func (w *Worker) Start(ctx context.Context) {
 }
 
 func (w *Worker) processBatch(ctx context.Context) {
-	jobs, err := w.repo.Claim(ctx, w.id, w.concurrency)
+	// only claim what we have capacity for right now
+	available := cap(w.sem) - len(w.sem)
+	if available == 0 {
+		return
+	}
+
+	jobs, err := w.repo.Claim(ctx, w.id, available)
 	if err != nil {
 		log.Printf("worker: claim error: %v", err)
 		return
@@ -63,19 +70,16 @@ func (w *Worker) processBatch(ctx context.Context) {
 		return
 	}
 
-	log.Printf("worker: claimed %d jobs", len(jobs))
+	log.Printf("worker: claimed %d jobs (%d/%d slots in use)", len(jobs), len(w.sem), cap(w.sem))
 
-	// for each job we claimed, run/execute it in separate goroutine
-	// this worker goroutine will be blocked until they are executed/timed out
-	var wg sync.WaitGroup
 	for _, job := range jobs {
-		wg.Add(1)
+		w.sem <- struct{}{} // acquire slot
 		go func(j *domain.Job) {
-			defer wg.Done()
+			defer func() { <-w.sem }() // release slot when done
 			w.runJob(ctx, j)
 		}(job)
 	}
-	wg.Wait()
+	// no blocking — slow jobs hold their slot, poll loop continues freely
 }
 
 func (w *Worker) runJob(ctx context.Context, job *domain.Job) {

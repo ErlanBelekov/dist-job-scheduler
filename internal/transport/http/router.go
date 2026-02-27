@@ -8,6 +8,7 @@ import (
 func NewRouter(jobHandler *handler.JobHandler) *gin.Engine {
 	r := gin.Default()
 
+	r.GET("/jobs/:id", jobHandler.GetByID)
 	// Schedules a job to be executed later, calls UseCase/Service
 	r.POST("/jobs", jobHandler.Create)
 

@@ -2,7 +2,9 @@ package main
 
 import (
 	"context"
+	"errors"
 	"log"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
@@ -35,7 +37,6 @@ func main() {
 	jobUsecase := usecase.NewJobUsecase(jobRepo)
 	jobHandler := handler.NewJobHandler(jobUsecase)
 
-	// start worker in background
 	worker := scheduler.NewWorker(
 		jobRepo,
 		time.Duration(cfg.PollIntervalSec)*time.Second,
@@ -43,6 +44,32 @@ func main() {
 	)
 	go worker.Start(ctx)
 
-	r := httptransport.NewRouter(jobHandler)
-	r.Run(":" + cfg.Port)
+	// reaper: runs every 30s, recovers jobs from workers that crashed
+	// heartbeat fires every 10s — 30s means 3 missed heartbeats before a job is considered stale
+	reaper := scheduler.NewReaper(jobRepo, 30*time.Second, 30*time.Second)
+	go reaper.Start(ctx)
+
+	srv := http.Server{
+		Addr:    ":" + cfg.Port,
+		Handler: httptransport.NewRouter(&jobHandler),
+	}
+
+	// run HTTP server in separate goroutine
+	go func() {
+		log.Printf("server listening on port %s", cfg.Port)
+		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			log.Fatalf("server: %v", err)
+		}
+	}()
+
+	// block until Ctrl+C / SIGTERM
+	<-ctx.Done()
+	log.Println("shutting down...")
+
+	// give in-flight HTTP requests up to 10s to finish
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if err := srv.Shutdown(shutdownCtx); err != nil {
+		log.Printf("server shutdown: %v", err)
+	}
 }

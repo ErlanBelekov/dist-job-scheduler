@@ -1,18 +1,22 @@
 # Overview
 
-Distributed job scheduler that can scale horizontally, written in Go.
+Distributed job scheduler for serverless HTTP and gRPC messaging, written in Go.
 
 Functionality:
 
-- schedule a job(firing HTTP request) for execution at specific time with <1-2s latency
+- schedule a job for execution at a specific time with <1-2s latency
 - execute pending jobs exactly once
 - automatic retries with backoff
 - get metadata about jobs and executions
+- multiple transports: REST API and gRPC
 
 Stack:
 
 - Go
 - PostgreSQL
+- gin
+- pgx
+- goose for migrations
 
 Add Later:
 

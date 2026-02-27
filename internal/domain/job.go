@@ -22,29 +22,29 @@ const (
 )
 
 type Job struct {
-	ID             string
-	IdempotencyKey string
-	URL            string
-	Method         string
-	Headers        map[string]string
-	Body           *string // nil means no body
-	TimeoutSeconds int
+	ID             string            `json:"id"`
+	IdempotencyKey string            `json:"idempotencyKey"`
+	URL            string            `json:"url"`
+	Method         string            `json:"method"`
+	Headers        map[string]string `json:"headers"`
+	Body           *string           `json:"body,omitempty"`
+	TimeoutSeconds int               `json:"timeoutSeconds"`
 
-	Status      Status
-	ScheduledAt time.Time
+	Status      Status    `json:"status"`
+	ScheduledAt time.Time `json:"scheduledAt"`
 
-	RetryCount int
-	MaxRetries int
-	Backoff    Backoff
+	RetryCount int     `json:"retryCount"`
+	MaxRetries int     `json:"maxRetries"`
+	Backoff    Backoff `json:"backoff"`
 
-	ClaimedAt   *time.Time
-	ClaimedBy   *string // worker ID
-	HeartbeatAt *time.Time
-	CompletedAt *time.Time
-	LastError   *string
+	ClaimedAt   *time.Time `json:"claimedAt"`
+	ClaimedBy   *string    `json:"claimedBy"`
+	HeartbeatAt *time.Time `json:"heartbeatAt"`
+	CompletedAt *time.Time `json:"completedAt"`
+	LastError   *string    `json:"lastError"`
 
-	CreatedAt time.Time // when the Job was created
-	UpdatedAt time.Time
+	CreatedAt time.Time `json:"createdAt"`
+	UpdatedAt time.Time `json:"updatedAt"`
 }
 
 type JobAttempt struct {

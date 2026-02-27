@@ -14,8 +14,8 @@ type JobHandler struct {
 	jobUsecase *usecase.JobUsecase
 }
 
-func NewJobHandler(jobUsecase *usecase.JobUsecase) *JobHandler {
-	return &JobHandler{jobUsecase: jobUsecase}
+func NewJobHandler(jobUsecase *usecase.JobUsecase) JobHandler {
+	return JobHandler{jobUsecase: jobUsecase}
 }
 
 type createJobRequest struct {
@@ -55,4 +55,18 @@ func (h *JobHandler) Create(ctx *gin.Context) {
 	}
 
 	ctx.JSON(http.StatusCreated, job)
+}
+
+// Get a Job by ID
+func (h *JobHandler) GetByID(ctx *gin.Context) {
+	jobID := ctx.Param("id")
+
+	job, err := h.jobUsecase.GetById(ctx.Request.Context(), jobID)
+	if err != nil {
+		log.Printf("GetByID error: %v", err)
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+		return
+	}
+
+	ctx.JSON(http.StatusOK, job)
 }

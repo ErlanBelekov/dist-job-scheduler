@@ -20,4 +20,8 @@ type JobRepository interface {
 	Complete(ctx context.Context, jobID string) error
 	Fail(ctx context.Context, jobID string, lastError string) error
 	Reschedule(ctx context.Context, jobID string, lastError string, retryAt time.Time) error
+
+	// Reaper methods — recover jobs from crashed workers
+	RescheduleStale(ctx context.Context, staleCutoff time.Time, limit int) (int, error)
+	FailStale(ctx context.Context, staleCutoff time.Time, limit int) (int, error)
 }

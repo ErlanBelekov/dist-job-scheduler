@@ -132,6 +132,46 @@ func (r *JobRepository) Reschedule(ctx context.Context, jobID string, lastError 
 	return err
 }
 
+func (r *JobRepository) RescheduleStale(ctx context.Context, staleCutoff time.Time, limit int) (int, error) {
+	tag, err := r.pool.Exec(ctx, `
+		UPDATE jobs
+		SET    status       = 'pending',
+		       retry_count  = retry_count + 1,
+		       last_error   = 'worker timeout',
+		       claimed_at   = NULL,
+		       claimed_by   = NULL,
+		       heartbeat_at = NULL,
+		       updated_at   = NOW()
+		WHERE id IN (
+			SELECT id FROM jobs
+			WHERE  status       = 'running'
+			  AND  heartbeat_at < $1
+			  AND  retry_count  < max_retries
+			ORDER BY heartbeat_at ASC
+			LIMIT $2
+			FOR UPDATE SKIP LOCKED
+		)`, staleCutoff, limit)
+	return int(tag.RowsAffected()), err
+}
+
+func (r *JobRepository) FailStale(ctx context.Context, staleCutoff time.Time, limit int) (int, error) {
+	tag, err := r.pool.Exec(ctx, `
+		UPDATE jobs
+		SET    status      = 'failed',
+		       last_error  = 'worker timeout: max retries exceeded',
+		       updated_at  = NOW()
+		WHERE id IN (
+			SELECT id FROM jobs
+			WHERE  status       = 'running'
+			  AND  heartbeat_at < $1
+			  AND  retry_count  >= max_retries
+			ORDER BY heartbeat_at ASC
+			LIMIT $2
+			FOR UPDATE SKIP LOCKED
+		)`, staleCutoff, limit)
+	return int(tag.RowsAffected()), err
+}
+
 // pgx.Row and pgx.Rows both implement this
 type rowScanner interface {
 	Scan(dest ...any) error
