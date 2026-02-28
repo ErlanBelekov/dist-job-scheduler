@@ -8,6 +8,7 @@ import (
 
 	"github.com/ErlanBelekov/dist-job-scheduler/internal/domain"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -43,7 +44,15 @@ func (r *JobRepository) Create(ctx context.Context, job *domain.Job) (*domain.Jo
 		job.Backoff,
 	)
 
-	return scanJob(row)
+	created, err := scanJob(row)
+	if err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+			return nil, domain.ErrDuplicateJob
+		}
+		return nil, err
+	}
+	return created, nil
 }
 
 func (r *JobRepository) GetByID(ctx context.Context, id string) (*domain.Job, error) {

@@ -5,7 +5,10 @@ import (
 	"time"
 )
 
-var ErrJobNotFound = errors.New("job not found")
+var (
+	ErrJobNotFound      = errors.New("job not found")
+	ErrDuplicateJob     = errors.New("job with this idempotency key already exists")
+)
 
 type Status string
 

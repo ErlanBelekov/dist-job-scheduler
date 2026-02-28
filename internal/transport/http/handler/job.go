@@ -32,6 +32,21 @@ type createJobRequest struct {
 	Backoff        domain.Backoff    `json:"backoff"         binding:"omitempty,oneof=exponential linear"`
 }
 
+type createJobResponse struct {
+	ID        string    `json:"id"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+type getJobResponse struct {
+	ID          string         `json:"id"`
+	Status      domain.Status  `json:"status"`
+	ScheduledAt time.Time      `json:"scheduled_at"`
+	CreatedAt   time.Time      `json:"created_at"`
+	UpdatedAt   time.Time      `json:"updated_at"`
+	CompletedAt *time.Time     `json:"completed_at,omitempty"`
+	LastError   *string        `json:"last_error,omitempty"`
+}
+
 func (h *JobHandler) Create(ctx *gin.Context) {
 	var req createJobRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -51,15 +66,21 @@ func (h *JobHandler) Create(ctx *gin.Context) {
 		Backoff:        req.Backoff,
 	})
 	if err != nil {
+		if errors.Is(err, domain.ErrDuplicateJob) {
+			ctx.JSON(http.StatusBadRequest, gin.H{"error": domain.ErrDuplicateJob.Error()})
+			return
+		}
 		h.logger.Error("create job", "error", err)
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
 		return
 	}
 
-	ctx.JSON(http.StatusCreated, job)
+	ctx.JSON(http.StatusCreated, createJobResponse{
+		ID:        job.ID,
+		CreatedAt: job.CreatedAt,
+	})
 }
 
-// Get a Job by ID
 func (h *JobHandler) GetByID(ctx *gin.Context) {
 	jobID := ctx.Param("id")
 
@@ -74,5 +95,13 @@ func (h *JobHandler) GetByID(ctx *gin.Context) {
 		return
 	}
 
-	ctx.JSON(http.StatusOK, job)
+	ctx.JSON(http.StatusOK, getJobResponse{
+		ID:          job.ID,
+		Status:      job.Status,
+		ScheduledAt: job.ScheduledAt,
+		CreatedAt:   job.CreatedAt,
+		UpdatedAt:   job.UpdatedAt,
+		CompletedAt: job.CompletedAt,
+		LastError:   job.LastError,
+	})
 }
