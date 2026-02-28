@@ -1,0 +1,18 @@
+# syntax=docker/dockerfile:1
+
+# Runs goose migrations — use as a one-off job before deploying server/scheduler.
+# Cloud Run Jobs, K8s init containers, or Fly.io release commands are all good fits.
+
+FROM golang:1.25-alpine AS builder
+
+RUN go install github.com/pressly/goose/v3/cmd/goose@latest
+
+FROM gcr.io/distroless/static-debian12
+
+COPY --from=builder /go/bin/goose /goose
+COPY migrations /migrations
+
+# Usage: docker run --rm -e DATABASE_URL=... migrate
+# Passes DATABASE_URL and any extra args to goose
+ENTRYPOINT ["/goose", "-dir", "/migrations", "postgres"]
+CMD ["up"]

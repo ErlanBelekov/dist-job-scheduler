@@ -9,6 +9,52 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U scheduler"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile.migrate
+    environment:
+      DATABASE_URL: postgres://scheduler:scheduler@postgres:5432/scheduler?sslmode=disable
+    depends_on:
+      postgres:
+        condition: service_healthy
+    # Run once and exit
+    profiles: [migrate]
+
+  server:
+    build:
+      context: .
+      dockerfile: Dockerfile.server
+    environment:
+      ENV: local
+      PORT: 8080
+      DATABASE_URL: postgres://scheduler:scheduler@postgres:5432/scheduler?sslmode=disable
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    profiles: [app]
+
+  scheduler:
+    build:
+      context: .
+      dockerfile: Dockerfile.scheduler
+    environment:
+      ENV: local
+      DATABASE_URL: postgres://scheduler:scheduler@postgres:5432/scheduler?sslmode=disable
+      WORKER_COUNT: "5"
+      POLL_INTERVAL_SEC: "1"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    profiles: [app]
 
 volumes:
   postgres_data:
