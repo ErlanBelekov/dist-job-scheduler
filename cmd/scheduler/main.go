@@ -27,6 +27,7 @@ func main() {
 
 	pool, err := postgres.NewPool(ctx, cfg.DatabaseURL)
 	if err != nil {
+		stop()
 		log.Fatalf("db: %v", err)
 	}
 	defer pool.Close()
