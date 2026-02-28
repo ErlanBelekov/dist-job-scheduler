@@ -1,8 +1,11 @@
 package domain
 
 import (
+	"errors"
 	"time"
 )
+
+var ErrJobNotFound = errors.New("job not found")
 
 type Status string
 

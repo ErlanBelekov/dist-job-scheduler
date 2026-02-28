@@ -65,7 +65,7 @@ func (u *JobUsecase) CreateJob(ctx context.Context, input CreateJobInput) (*doma
 	return created, nil
 }
 
-func (u *JobUsecase) GetById(ctx context.Context, jobID string) (*domain.Job, error) {
+func (u *JobUsecase) GetByID(ctx context.Context, jobID string) (*domain.Job, error) {
 	job, err := u.repo.GetByID(ctx, jobID)
-	return job, err
+	return job, fmt.Errorf("get job: %w", err)
 }

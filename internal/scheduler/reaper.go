@@ -2,7 +2,7 @@ package scheduler
 
 import (
 	"context"
-	"log"
+	"log/slog"
 	"time"
 
 	"github.com/ErlanBelekov/dist-job-scheduler/internal/repository"
@@ -10,13 +10,15 @@ import (
 
 type Reaper struct {
 	repo             repository.JobRepository
+	logger           *slog.Logger
 	interval         time.Duration
 	heartbeatTimeout time.Duration
 }
 
-func NewReaper(repo repository.JobRepository, interval time.Duration, heartbeatTimeout time.Duration) *Reaper {
+func NewReaper(repo repository.JobRepository, logger *slog.Logger, interval time.Duration, heartbeatTimeout time.Duration) *Reaper {
 	return &Reaper{
 		repo:             repo,
+		logger:           logger,
 		interval:         interval,
 		heartbeatTimeout: heartbeatTimeout,
 	}
@@ -26,12 +28,12 @@ func (r *Reaper) Start(ctx context.Context) {
 	ticker := time.NewTicker(r.interval)
 	defer ticker.Stop()
 
-	log.Printf("reaper started (interval=%s, heartbeat_timeout=%s)", r.interval, r.heartbeatTimeout)
+	r.logger.Info("reaper started", "interval", r.interval, "heartbeat_timeout", r.heartbeatTimeout)
 
 	for {
 		select {
 		case <-ctx.Done():
-			log.Println("reaper: shut down")
+			r.logger.Info("reaper shut down")
 			return
 		case <-ticker.C:
 			r.reap(ctx)
@@ -44,15 +46,15 @@ func (r *Reaper) reap(ctx context.Context) {
 
 	rescheduled, err := r.repo.RescheduleStale(ctx, staleCutoff, 100)
 	if err != nil {
-		log.Printf("reaper: reschedule stale: %v", err)
+		r.logger.Error("reschedule stale jobs", "error", err)
 	} else if rescheduled > 0 {
-		log.Printf("reaper: rescheduled %d stale jobs", rescheduled)
+		r.logger.Info("rescheduled stale jobs", "count", rescheduled)
 	}
 
 	failed, err := r.repo.FailStale(ctx, staleCutoff, 100)
 	if err != nil {
-		log.Printf("reaper: fail stale: %v", err)
+		r.logger.Error("fail stale jobs", "error", err)
 	} else if failed > 0 {
-		log.Printf("reaper: permanently failed %d stale jobs (max retries exceeded)", failed)
+		r.logger.Info("permanently failed stale jobs", "count", failed)
 	}
 }

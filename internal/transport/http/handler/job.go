@@ -1,7 +1,8 @@
 package handler
 
 import (
-	"log"
+	"errors"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -12,10 +13,11 @@ import (
 
 type JobHandler struct {
 	jobUsecase *usecase.JobUsecase
+	logger     *slog.Logger
 }
 
-func NewJobHandler(jobUsecase *usecase.JobUsecase) JobHandler {
-	return JobHandler{jobUsecase: jobUsecase}
+func NewJobHandler(jobUsecase *usecase.JobUsecase, logger *slog.Logger) *JobHandler {
+	return &JobHandler{jobUsecase: jobUsecase, logger: logger.With("component", "job_handler")}
 }
 
 type createJobRequest struct {
@@ -49,7 +51,7 @@ func (h *JobHandler) Create(ctx *gin.Context) {
 		Backoff:        req.Backoff,
 	})
 	if err != nil {
-		log.Printf("create job error: %v", err)
+		h.logger.Error("create job", "error", err)
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
 		return
 	}
@@ -61,9 +63,13 @@ func (h *JobHandler) Create(ctx *gin.Context) {
 func (h *JobHandler) GetByID(ctx *gin.Context) {
 	jobID := ctx.Param("id")
 
-	job, err := h.jobUsecase.GetById(ctx.Request.Context(), jobID)
+	job, err := h.jobUsecase.GetByID(ctx.Request.Context(), jobID)
 	if err != nil {
-		log.Printf("GetByID error: %v", err)
+		if errors.Is(err, domain.ErrJobNotFound) {
+			ctx.JSON(http.StatusNotFound, gin.H{"error": "job not found"})
+			return
+		}
+		h.logger.Error("get job by id", "job_id", jobID, "error", err)
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
 		return
 	}

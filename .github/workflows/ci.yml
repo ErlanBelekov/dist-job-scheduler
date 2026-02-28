@@ -1,0 +1,72 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: false  # golangci-lint manages its own cache
+
+      - uses: golangci/golangci-lint-action@v6
+        with:
+          version: v1.64.8
+
+  build-test:
+    name: Build & Test
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: scheduler
+          POSTGRES_PASSWORD: scheduler
+          POSTGRES_DB: scheduler
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgres://scheduler:scheduler@localhost:5432/scheduler?sslmode=disable
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Download dependencies
+        run: go mod download
+
+      - name: Verify dependencies
+        run: go mod verify
+
+      - name: Build server
+        run: go build -v ./cmd/server/...
+
+      - name: Build scheduler
+        run: go build -v ./cmd/scheduler/...
+
+      - name: Run migrations
+        run: |
+          go install github.com/pressly/goose/v3/cmd/goose@latest
+          goose -dir ./migrations postgres "$DATABASE_URL" up
+
+      - name: Test
+        run: go test -race -count=1 -timeout=120s ./...

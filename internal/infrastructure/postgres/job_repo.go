@@ -2,10 +2,12 @@ package postgres
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
 	"github.com/ErlanBelekov/dist-job-scheduler/internal/domain"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -187,6 +189,9 @@ func scanJob(row rowScanner) (*domain.Job, error) {
 		&j.HeartbeatAt, &j.CompletedAt, &j.LastError, &j.CreatedAt, &j.UpdatedAt,
 	)
 	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, domain.ErrJobNotFound
+		}
 		return nil, fmt.Errorf("scan job: %w", err)
 	}
 	return &j, nil
