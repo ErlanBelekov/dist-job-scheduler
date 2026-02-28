@@ -27,7 +27,6 @@ func main() {
 	logger := newLogger(cfg.Env)
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer stop()
 
 	pool, err := postgres.NewPool(ctx, cfg.DatabaseURL)
 	if err != nil {
@@ -53,6 +52,7 @@ func main() {
 	}()
 
 	<-ctx.Done()
+	stop()
 	logger.Info("shutting down...")
 
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)

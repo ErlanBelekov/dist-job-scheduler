@@ -23,7 +23,6 @@ func main() {
 	logger := newLogger(cfg.Env)
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer stop()
 
 	pool, err := postgres.NewPool(ctx, cfg.DatabaseURL)
 	if err != nil {
@@ -49,6 +48,7 @@ func main() {
 	go reaper.Start(ctx)
 
 	<-ctx.Done()
+	stop()
 	logger.Info("scheduler shut down")
 }
 
