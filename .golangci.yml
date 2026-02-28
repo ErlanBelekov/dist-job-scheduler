@@ -5,21 +5,20 @@ linters:
   enable:
     - errcheck       # unhandled errors
     - govet          # go vet checks (printf format, struct alignment, etc.)
-    - staticcheck    # 150+ static analysis checks (replaces megacheck)
+    - staticcheck    # 150+ static analysis checks; includes gosimple + stylecheck in v2
     - unused         # unexported symbols never used outside their package
-    - gosimple       # simplify code patterns
     - ineffassign    # assignments whose result is never used
     - bodyclose      # HTTP response body not closed
     - noctx          # HTTP requests without context
     - exhaustive     # missing cases in switch on enum types
     - gocritic       # opinionated but practical style checks
 
-linters-settings:
-  govet:
-    enable:
-      - shadow        # variable shadowing
-  exhaustive:
-    default-signifies-exhaustive: true   # switch with default: is OK
+  settings:
+    govet:
+      enable:
+        - shadow      # variable shadowing
+    exhaustive:
+      default-signifies-exhaustive: true   # switch with default: is OK
 
 issues:
   max-same-issues: 0   # show all issues, not just 3 per linter

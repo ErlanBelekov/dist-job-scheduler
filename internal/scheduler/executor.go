@@ -52,7 +52,7 @@ func (e *Executor) Run(ctx context.Context, job *domain.Job) ExecutionResult {
 		return ExecutionResult{Err: fmt.Errorf("do request: %w", err), Duration: time.Since(start)}
 	}
 	defer resp.Body.Close()
-	io.Copy(io.Discard, resp.Body) // drain so the connection can be reused by the pool
+	_, _ = io.Copy(io.Discard, resp.Body) // drain so the connection can be reused by the pool
 
 	return ExecutionResult{StatusCode: resp.StatusCode, Duration: time.Since(start)}
 }
