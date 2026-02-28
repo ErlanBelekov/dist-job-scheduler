@@ -24,3 +24,10 @@ Add Later:
 - OpenTelemetry, Prometheus, Grafana for monitoring and observability
 - Dockerize
 - Deploy to GCP Cloud Run and scale to zero
+
+# Metrics to implement later, can be useful probably at bigger scale:
+
+- amount of times the schedulers shut down
+- average life of a single scheduler worker instance
+- latency between creation of job and scheduler picking it up(when its status changes to "running")
+- average client server latency, error rate, etc
