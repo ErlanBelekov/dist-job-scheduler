@@ -20,11 +20,13 @@ linters:
     exhaustive:
       default-signifies-exhaustive: true   # switch with default: is OK
 
+  exclusions:
+    rules:
+      # Test files get a relaxed ruleset
+      - path: _test\.go
+        linters:
+          - errcheck
+          - gocritic
+
 issues:
   max-same-issues: 0   # show all issues, not just 3 per linter
-  exclude-rules:
-    # Test files get a relaxed ruleset
-    - path: _test\.go
-      linters:
-        - errcheck
-        - gocritic
