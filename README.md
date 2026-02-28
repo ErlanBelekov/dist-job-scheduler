@@ -18,6 +18,14 @@ Stack:
 - pgx
 - goose for migrations
 
+Thinking about the plan for implementation:
+
+- basic Job CRUD and scheduler with locks
+- authentication(magic links)
+- store execution history of each job
+- exactly-once execution(prevent race conditions and multiple executions of a single job, I think we already have that with the DB locking now and reaper process)
+- endpoints to query data for front-end: jobs, executions of each job
+
 Add Later:
 
 - CI/CD pipeline with linting, tests, migrations
@@ -31,3 +39,4 @@ Add Later:
 - average life of a single scheduler worker instance
 - latency between creation of job and scheduler picking it up(when its status changes to "running")
 - average client server latency, error rate, etc
+- amount of jobs picked up by reaper(failed scheduler executions) and amount of jobs processed within scheduler. In perfect world, < 1% of jobs should be picked by reaper
