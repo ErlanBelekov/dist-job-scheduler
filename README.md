@@ -31,7 +31,7 @@ Add Later:
 - CI/CD pipeline with linting, tests, migrations
 - OpenTelemetry, Prometheus, Grafana for monitoring and observability
 - Dockerize
-- Deploy to GCP Cloud Run and scale to zero
+- Deploy to GCP K8S, add staging + prod envs, modify CI/CD, add Terraform(Enkidu)
 
 # Metrics to implement later, can be useful probably at bigger scale:
 
