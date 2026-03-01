@@ -4,9 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/ErlanBelekov/dist-job-scheduler/internal/domain"
+	"github.com/ErlanBelekov/dist-job-scheduler/internal/repository"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -183,6 +185,48 @@ func (r *JobRepository) FailStale(ctx context.Context, staleCutoff time.Time, li
 			FOR UPDATE SKIP LOCKED
 		)`, staleCutoff, limit)
 	return int(tag.RowsAffected()), err
+}
+
+func (r *JobRepository) ListJobs(ctx context.Context, input repository.ListJobsInput) ([]*domain.Job, error) {
+	args := []any{input.UserID}
+	where := []string{"user_id = $1"}
+
+	if input.Status != "" {
+		args = append(args, input.Status)
+		where = append(where, fmt.Sprintf("status = $%d", len(args)))
+	}
+	if input.CursorTime != nil {
+		args = append(args, *input.CursorTime, input.CursorID)
+		where = append(where, fmt.Sprintf("(scheduled_at, id) < ($%d, $%d)", len(args)-1, len(args)))
+	}
+	args = append(args, input.Limit)
+
+	query := fmt.Sprintf(`
+		SELECT id, user_id, idempotency_key, url, method, headers, body,
+		       timeout_seconds, status, scheduled_at, retry_count,
+		       max_retries, backoff, claimed_at, claimed_by,
+		       heartbeat_at, completed_at, last_error, created_at, updated_at
+		FROM jobs
+		WHERE %s
+		ORDER BY scheduled_at DESC, id DESC
+		LIMIT $%d`,
+		strings.Join(where, " AND "), len(args))
+
+	rows, err := r.pool.Query(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("list jobs: %w", err)
+	}
+	defer rows.Close()
+
+	var jobs []*domain.Job
+	for rows.Next() {
+		j, err := scanJob(rows)
+		if err != nil {
+			return nil, err
+		}
+		jobs = append(jobs, j)
+	}
+	return jobs, nil
 }
 
 // pgx.Row and pgx.Rows both implement this.

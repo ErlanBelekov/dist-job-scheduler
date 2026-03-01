@@ -17,6 +17,7 @@ func NewRouter(jobHandler *handler.JobHandler, authHandler *handler.AuthHandler,
 
 	// Protected job routes
 	jobs := r.Group("/jobs", middleware.Auth(jwtKey))
+	jobs.GET("", jobHandler.List)
 	jobs.POST("", jobHandler.Create)
 	jobs.GET("/:id", jobHandler.GetByID)
 	jobs.GET("/:id/attempts", jobHandler.ListAttempts)

@@ -7,11 +7,20 @@ import (
 	"github.com/ErlanBelekov/dist-job-scheduler/internal/domain"
 )
 
+type ListJobsInput struct {
+	UserID     string
+	Status     domain.Status // empty = all statuses
+	CursorTime *time.Time    // nil = first page
+	CursorID   string        // used only when CursorTime is non-nil
+	Limit      int
+}
+
 // UseCase depends on interface, not concrete implementation.
 // This way we get: 1) can swap DB later without touching usecase 2) We can pass a mock implementation of interface in tests
 type JobRepository interface {
 	Create(ctx context.Context, job *domain.Job) (*domain.Job, error)
 	GetByID(ctx context.Context, jobID, userID string) (*domain.Job, error)
+	ListJobs(ctx context.Context, input ListJobsInput) ([]*domain.Job, error)
 
 	// what does the scheduler worker need? Worker to poll, then claim and process the batch
 	// Reaper process to find all failed jobs and re-schedule them for another attempt if a retry is possible

@@ -2,6 +2,7 @@ package handler
 
 import (
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"time"
@@ -47,6 +48,22 @@ type getJobResponse struct {
 	LastError   *string       `json:"last_error,omitempty"`
 }
 
+type listJobItem struct {
+	ID          string        `json:"id"`
+	Status      domain.Status `json:"status"`
+	URL         string        `json:"url"`
+	Method      string        `json:"method"`
+	ScheduledAt time.Time     `json:"scheduled_at"`
+	CreatedAt   time.Time     `json:"created_at"`
+	CompletedAt *time.Time    `json:"completed_at,omitempty"`
+	LastError   *string       `json:"last_error,omitempty"`
+}
+
+type listJobsResponse struct {
+	Jobs       []listJobItem `json:"jobs"`
+	NextCursor *string       `json:"next_cursor"`
+}
+
 type attemptResponse struct {
 	ID          string     `json:"id"`
 	JobID       string     `json:"job_id"`
@@ -57,6 +74,46 @@ type attemptResponse struct {
 	StatusCode  *int       `json:"status_code"`
 	Error       *string    `json:"error"`
 	DurationMS  *int64     `json:"duration_ms"`
+}
+
+func (h *JobHandler) List(ctx *gin.Context) {
+	limitStr := ctx.DefaultQuery("limit", "0")
+	var limit int
+	fmt.Sscan(limitStr, &limit)
+
+	result, err := h.jobUsecase.ListJobs(ctx.Request.Context(), usecase.ListJobsInput{
+		UserID: ctx.GetString("userID"),
+		Status: ctx.Query("status"),
+		Cursor: ctx.Query("cursor"),
+		Limit:  limit,
+	})
+	if err != nil {
+		if errors.Is(err, domain.ErrInvalidStatus) {
+			ctx.JSON(http.StatusBadRequest, gin.H{"error": errInvalidStatus})
+			return
+		}
+		h.logger.Error("list jobs", "error", err)
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": errInternalServer})
+		return
+	}
+
+	items := make([]listJobItem, len(result.Jobs))
+	for i, j := range result.Jobs {
+		items[i] = listJobItem{
+			ID:          j.ID,
+			Status:      j.Status,
+			URL:         j.URL,
+			Method:      j.Method,
+			ScheduledAt: j.ScheduledAt,
+			CreatedAt:   j.CreatedAt,
+			CompletedAt: j.CompletedAt,
+			LastError:   j.LastError,
+		}
+	}
+	ctx.JSON(http.StatusOK, listJobsResponse{
+		Jobs:       items,
+		NextCursor: result.NextCursor,
+	})
 }
 
 func (h *JobHandler) Create(ctx *gin.Context) {

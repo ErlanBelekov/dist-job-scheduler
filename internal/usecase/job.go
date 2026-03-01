@@ -2,6 +2,8 @@ package usecase
 
 import (
 	"context"
+	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -74,6 +76,96 @@ func (u *JobUsecase) GetByID(ctx context.Context, jobID, userID string) (*domain
 		return nil, fmt.Errorf("get job: %w", err)
 	}
 	return job, nil
+}
+
+type ListJobsInput struct {
+	UserID string
+	Status string
+	Cursor string // raw base64url from query param
+	Limit  int
+}
+
+type ListJobsResult struct {
+	Jobs       []*domain.Job
+	NextCursor *string
+}
+
+type jobCursor struct {
+	ScheduledAt time.Time `json:"s"`
+	ID          string    `json:"i"`
+}
+
+func decodeCursor(s string) (*time.Time, string, error) {
+	b, err := base64.RawURLEncoding.DecodeString(s)
+	if err != nil {
+		return nil, "", fmt.Errorf("decode cursor: %w", err)
+	}
+	var c jobCursor
+	if err := json.Unmarshal(b, &c); err != nil {
+		return nil, "", fmt.Errorf("unmarshal cursor: %w", err)
+	}
+	return &c.ScheduledAt, c.ID, nil
+}
+
+func encodeCursor(scheduledAt time.Time, id string) string {
+	b, _ := json.Marshal(jobCursor{ScheduledAt: scheduledAt, ID: id})
+	return base64.RawURLEncoding.EncodeToString(b)
+}
+
+var validStatuses = map[domain.Status]struct{}{
+	domain.StatusPending:   {},
+	domain.StatusRunning:   {},
+	domain.StatusCompleted: {},
+	domain.StatusFailed:    {},
+	domain.StatusCancelled: {},
+}
+
+func (u *JobUsecase) ListJobs(ctx context.Context, input ListJobsInput) (ListJobsResult, error) {
+	limit := input.Limit
+	if limit <= 0 {
+		limit = 20
+	}
+	if limit > 100 {
+		limit = 100
+	}
+
+	var status domain.Status
+	if input.Status != "" {
+		status = domain.Status(input.Status)
+		if _, ok := validStatuses[status]; !ok {
+			return ListJobsResult{}, domain.ErrInvalidStatus
+		}
+	}
+
+	repoInput := repository.ListJobsInput{
+		UserID: input.UserID,
+		Status: status,
+		Limit:  limit + 1,
+	}
+
+	if input.Cursor != "" {
+		cursorTime, cursorID, err := decodeCursor(input.Cursor)
+		if err != nil {
+			return ListJobsResult{}, domain.ErrInvalidStatus
+		}
+		repoInput.CursorTime = cursorTime
+		repoInput.CursorID = cursorID
+	}
+
+	jobs, err := u.repo.ListJobs(ctx, repoInput)
+	if err != nil {
+		return ListJobsResult{}, fmt.Errorf("list jobs: %w", err)
+	}
+
+	var nextCursor *string
+	if len(jobs) == limit+1 {
+		last := jobs[limit]
+		s := encodeCursor(last.ScheduledAt, last.ID)
+		nextCursor = &s
+		jobs = jobs[:limit]
+	}
+
+	return ListJobsResult{Jobs: jobs, NextCursor: nextCursor}, nil
 }
 
 func (u *JobUsecase) ListAttempts(ctx context.Context, jobID, userID string) ([]*domain.JobAttempt, error) {
