@@ -87,11 +87,13 @@ Each worker gets a disjoint set of jobs. No duplicates, no coordination overhead
 **HTTP responses**
 - Always drain and close response bodies: `defer func() { _ = resp.Body.Close() }()` + `_, _ = io.Copy(io.Discard, resp.Body)`
 - Per-job timeouts via `context.WithTimeout`, not a global `http.Client` timeout
+- The executor's `http.Client` has a 5-minute safety-net timeout as a last resort, but real per-job timeouts are enforced via context. TLS minimum version is 1.2, redirect limit is 10.
 
 **Database**
 - Use `pgxpool.Pool` — never `sql.DB`
 - Always `defer rows.Close()` after `pool.Query`
 - Share a `scanJob(rowScanner)` helper across single-row and multi-row queries to avoid Scan drift
+- Pool is configured with `MaxConnLifetime=1h`, `MaxConnIdleTime=30m`, `HealthCheckPeriod=30s`, `ConnectTimeout=5s` — do not remove these; they prevent stale connections under K8S pod restarts and DB failovers
 
 ## Stack
 
@@ -132,6 +134,14 @@ Required env vars (already in `.envrc` for local):
 | `MAGIC_LINK_BASE_URL` | `http://localhost:8080` | base for verify links in emails |
 | `RESEND_API_KEY` | not required locally | required in staging/production |
 | `RESEND_FROM` | not required locally | required in staging/production |
+
+### Seeding dev data
+
+```bash
+go run ./cmd/seed
+```
+
+Creates `seed@test.local` and 20 jobs scheduled 1 minute from now — a mix of jobs that will succeed, fail with retries, and timeout. Idempotent on re-runs. The script prints job IDs and curl commands ready to copy.
 
 ### Testing the auth flow locally
 
@@ -193,6 +203,20 @@ The raw token is never stored — only its SHA-256 hash. `ClaimMagicToken` is a 
 
 ### Transport error strings are constants
 `internal/transport/http/handler/errors.go` holds all HTTP-facing error message strings. Domain error values (`ErrJobNotFound`, etc.) are used for `errors.Is` branching only — never `.Error()` directly in responses. This keeps casing consistent and makes copy changes a one-liner.
+
+### Two-phase attempt writes (open before execute, close after)
+`CreateAttempt` is called before `executor.Run`, `CompleteAttempt` after. If a worker crashes mid-execution the attempt row stays in the DB with `completed_at = NULL` — immediately visible in `GET /jobs/:id/attempts` as an incomplete run. This is intentional: it gives operators a signal that a worker died holding this job, even before the reaper reschedules it.
+
+`CreateAttempt` failure is non-fatal — the job still executes, just without a history record for that run. Never let observability writes block execution.
+
+### Never wrap HTTP calls in a DB transaction
+Job execution (the outbound HTTP call) cannot be transactional. Holding a Postgres connection open for up to `timeout_seconds` (default 30s, max 3600s) while waiting for an external endpoint would starve the connection pool under any real concurrency. Each DB write in `runJob` is independent and failures are handled locally or by the reaper.
+
+### UNIQUE constraints as defensive guards
+`UNIQUE(job_id, attempt_num)` exists even though `FOR UPDATE SKIP LOCKED` already prevents two workers from claiming the same job. If a bug ever breaks the claiming logic, the DB rejects the duplicate attempt rather than silently storing phantom data. Cheap constraint, strong guarantee.
+
+### Security headers are applied globally
+`middleware.Security()` is registered on the root router via `r.Use(...)`, so every response — including 404s and 401s — gets the security headers. Do not register it per-route group or the unauthenticated error responses will be missing them.
 
 ### Unit test boundary
 Unit tests cover: auth usecase (token hashing, JWT signing), JWT middleware (missing/expired/wrong-key/valid token), HTTP handlers (request parsing, status codes). Ownership enforcement and composite uniqueness are SQL guarantees — they belong in integration tests against a real DB, not unit tests with fakes.
