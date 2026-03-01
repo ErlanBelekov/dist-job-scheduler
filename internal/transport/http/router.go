@@ -20,6 +20,7 @@ func NewRouter(jobHandler *handler.JobHandler, authHandler *handler.AuthHandler,
 	jobs.GET("", jobHandler.List)
 	jobs.POST("", jobHandler.Create)
 	jobs.GET("/:id", jobHandler.GetByID)
+	jobs.DELETE("/:id", jobHandler.Cancel)
 	jobs.GET("/:id/attempts", jobHandler.ListAttempts)
 
 	return r

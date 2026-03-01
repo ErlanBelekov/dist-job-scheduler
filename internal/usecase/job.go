@@ -70,6 +70,13 @@ func (u *JobUsecase) CreateJob(ctx context.Context, input CreateJobInput) (*doma
 	return created, nil
 }
 
+func (u *JobUsecase) CancelJob(ctx context.Context, jobID, userID string) error {
+	if err := u.repo.Cancel(ctx, jobID, userID); err != nil {
+		return fmt.Errorf("cancel job: %w", err)
+	}
+	return nil
+}
+
 func (u *JobUsecase) GetByID(ctx context.Context, jobID, userID string) (*domain.Job, error) {
 	job, err := u.repo.GetByID(ctx, jobID, userID)
 	if err != nil {

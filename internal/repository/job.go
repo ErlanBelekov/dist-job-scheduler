@@ -21,6 +21,7 @@ type JobRepository interface {
 	Create(ctx context.Context, job *domain.Job) (*domain.Job, error)
 	GetByID(ctx context.Context, jobID, userID string) (*domain.Job, error)
 	ListJobs(ctx context.Context, input ListJobsInput) ([]*domain.Job, error)
+	Cancel(ctx context.Context, jobID, userID string) error
 
 	// what does the scheduler worker need? Worker to poll, then claim and process the batch
 	// Reaper process to find all failed jobs and re-schedule them for another attempt if a retry is possible

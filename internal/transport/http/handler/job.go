@@ -76,6 +76,26 @@ type attemptResponse struct {
 	DurationMS  *int64     `json:"duration_ms"`
 }
 
+func (h *JobHandler) Cancel(ctx *gin.Context) {
+	jobID := ctx.Param("id")
+
+	err := h.jobUsecase.CancelJob(ctx.Request.Context(), jobID, ctx.GetString("userID"))
+	if err != nil {
+		switch {
+		case errors.Is(err, domain.ErrJobNotFound):
+			ctx.JSON(http.StatusNotFound, gin.H{"error": errJobNotFound})
+		case errors.Is(err, domain.ErrJobNotCancellable):
+			ctx.JSON(http.StatusConflict, gin.H{"error": errJobNotCancellable})
+		default:
+			h.logger.Error("cancel job", "job_id", jobID, "error", err)
+			ctx.JSON(http.StatusInternalServerError, gin.H{"error": errInternalServer})
+		}
+		return
+	}
+
+	ctx.Status(http.StatusNoContent)
+}
+
 func (h *JobHandler) List(ctx *gin.Context) {
 	limit, _ := strconv.Atoi(ctx.Query("limit"))
 

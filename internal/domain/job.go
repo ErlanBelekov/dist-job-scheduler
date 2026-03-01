@@ -6,9 +6,10 @@ import (
 )
 
 var (
-	ErrJobNotFound   = errors.New("job not found")
-	ErrDuplicateJob  = errors.New("job with this idempotency key already exists")
-	ErrInvalidStatus = errors.New("invalid status value")
+	ErrJobNotFound      = errors.New("job not found")
+	ErrDuplicateJob     = errors.New("job with this idempotency key already exists")
+	ErrInvalidStatus    = errors.New("invalid status value")
+	ErrJobNotCancellable = errors.New("job is not in a cancellable state")
 )
 
 type Status string

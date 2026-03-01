@@ -187,6 +187,23 @@ func (r *JobRepository) FailStale(ctx context.Context, staleCutoff time.Time, li
 	return int(tag.RowsAffected()), err
 }
 
+func (r *JobRepository) Cancel(ctx context.Context, jobID, userID string) error {
+	tag, err := r.pool.Exec(ctx,
+		`UPDATE jobs SET status = 'cancelled', updated_at = NOW()
+		WHERE id = $1 AND user_id = $2 AND status = 'pending'`,
+		jobID, userID)
+	if err != nil {
+		return fmt.Errorf("cancel job: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		if _, err := r.GetByID(ctx, jobID, userID); err != nil {
+			return err // ErrJobNotFound
+		}
+		return domain.ErrJobNotCancellable
+	}
+	return nil
+}
+
 func (r *JobRepository) ListJobs(ctx context.Context, input repository.ListJobsInput) ([]*domain.Job, error) {
 	args := []any{input.UserID}
 	where := []string{"user_id = $1"}
