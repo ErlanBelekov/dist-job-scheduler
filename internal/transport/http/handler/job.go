@@ -38,13 +38,25 @@ type createJobResponse struct {
 }
 
 type getJobResponse struct {
-	ID          string         `json:"id"`
-	Status      domain.Status  `json:"status"`
-	ScheduledAt time.Time      `json:"scheduled_at"`
-	CreatedAt   time.Time      `json:"created_at"`
-	UpdatedAt   time.Time      `json:"updated_at"`
-	CompletedAt *time.Time     `json:"completed_at,omitempty"`
-	LastError   *string        `json:"last_error,omitempty"`
+	ID          string        `json:"id"`
+	Status      domain.Status `json:"status"`
+	ScheduledAt time.Time     `json:"scheduled_at"`
+	CreatedAt   time.Time     `json:"created_at"`
+	UpdatedAt   time.Time     `json:"updated_at"`
+	CompletedAt *time.Time    `json:"completed_at,omitempty"`
+	LastError   *string       `json:"last_error,omitempty"`
+}
+
+type attemptResponse struct {
+	ID          string     `json:"id"`
+	JobID       string     `json:"job_id"`
+	AttemptNum  int        `json:"attempt_num"`
+	WorkerID    string     `json:"worker_id"`
+	StartedAt   time.Time  `json:"started_at"`
+	CompletedAt *time.Time `json:"completed_at"`
+	StatusCode  *int       `json:"status_code"`
+	Error       *string    `json:"error"`
+	DurationMS  *int64     `json:"duration_ms"`
 }
 
 func (h *JobHandler) Create(ctx *gin.Context) {
@@ -80,6 +92,37 @@ func (h *JobHandler) Create(ctx *gin.Context) {
 		ID:        job.ID,
 		CreatedAt: job.CreatedAt,
 	})
+}
+
+func (h *JobHandler) ListAttempts(ctx *gin.Context) {
+	jobID := ctx.Param("id")
+
+	attempts, err := h.jobUsecase.ListAttempts(ctx.Request.Context(), jobID, ctx.GetString("userID"))
+	if err != nil {
+		if errors.Is(err, domain.ErrJobNotFound) {
+			ctx.JSON(http.StatusNotFound, gin.H{"error": errJobNotFound})
+			return
+		}
+		h.logger.Error("list attempts", "job_id", jobID, "error", err)
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": errInternalServer})
+		return
+	}
+
+	resp := make([]attemptResponse, len(attempts))
+	for i, a := range attempts {
+		resp[i] = attemptResponse{
+			ID:          a.ID,
+			JobID:       a.JobID,
+			AttemptNum:  a.AttemptNum,
+			WorkerID:    a.WorkerID,
+			StartedAt:   a.StartedAt,
+			CompletedAt: a.CompletedAt,
+			StatusCode:  a.StatusCode,
+			Error:       a.Error,
+			DurationMS:  a.DurationMS,
+		}
+	}
+	ctx.JSON(http.StatusOK, resp)
 }
 
 func (h *JobHandler) GetByID(ctx *gin.Context) {
