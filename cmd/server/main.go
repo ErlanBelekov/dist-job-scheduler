@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/ErlanBelekov/dist-job-scheduler/config"
+	"github.com/ErlanBelekov/dist-job-scheduler/internal/email"
 	"github.com/ErlanBelekov/dist-job-scheduler/internal/infrastructure/postgres"
 	httptransport "github.com/ErlanBelekov/dist-job-scheduler/internal/transport/http"
 	"github.com/ErlanBelekov/dist-job-scheduler/internal/transport/http/handler"
@@ -35,13 +36,20 @@ func main() {
 	}
 	defer pool.Close()
 
+	// Jobs
 	jobRepo := postgres.NewJobRepository(pool)
 	jobUsecase := usecase.NewJobUsecase(jobRepo)
 	jobHandler := handler.NewJobHandler(jobUsecase, logger)
 
+	// Auth
+	userRepo := postgres.NewUserRepository(pool)
+	emailSender := email.NewSender(cfg.Env, cfg.ResendAPIKey, cfg.ResendFrom, logger)
+	authUsecase := usecase.NewAuthUsecase(userRepo, emailSender, []byte(cfg.JWTSecret), cfg.MagicLinkBase)
+	authHandler := handler.NewAuthHandler(authUsecase, logger)
+
 	srv := http.Server{
 		Addr:    ":" + cfg.Port,
-		Handler: httptransport.NewRouter(jobHandler),
+		Handler: httptransport.NewRouter(jobHandler, authHandler, []byte(cfg.JWTSecret)),
 	}
 
 	go func() {

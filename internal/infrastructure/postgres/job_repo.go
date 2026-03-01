@@ -22,16 +22,17 @@ func NewJobRepository(pool *pgxpool.Pool) *JobRepository {
 
 func (r *JobRepository) Create(ctx context.Context, job *domain.Job) (*domain.Job, error) {
 	query := `
-                INSERT INTO jobs (
-                        idempotency_key, url, method, headers, body,
-                        timeout_seconds, status, scheduled_at, max_retries, backoff
-                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-                RETURNING id, idempotency_key, url, method, headers, body,
-                          timeout_seconds, status, scheduled_at, retry_count,
-                          max_retries, backoff, claimed_at, claimed_by,
-                          heartbeat_at, completed_at, last_error, created_at, updated_at`
+		INSERT INTO jobs (
+			user_id, idempotency_key, url, method, headers, body,
+			timeout_seconds, status, scheduled_at, max_retries, backoff
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+		RETURNING id, user_id, idempotency_key, url, method, headers, body,
+		          timeout_seconds, status, scheduled_at, retry_count,
+		          max_retries, backoff, claimed_at, claimed_by,
+		          heartbeat_at, completed_at, last_error, created_at, updated_at`
 
 	row := r.pool.QueryRow(ctx, query,
+		job.UserID,
 		job.IdempotencyKey,
 		job.URL,
 		job.Method,
@@ -55,40 +56,41 @@ func (r *JobRepository) Create(ctx context.Context, job *domain.Job) (*domain.Jo
 	return created, nil
 }
 
-func (r *JobRepository) GetByID(ctx context.Context, id string) (*domain.Job, error) {
+func (r *JobRepository) GetByID(ctx context.Context, id, userID string) (*domain.Job, error) {
 	query := `
-                SELECT id, idempotency_key, url, method, headers, body,
-                       timeout_seconds, status, scheduled_at, retry_count,
-                       max_retries, backoff, claimed_at, claimed_by,
-                       heartbeat_at, completed_at, last_error, created_at, updated_at
-                FROM jobs WHERE id = $1`
+		SELECT id, user_id, idempotency_key, url, method, headers, body,
+		       timeout_seconds, status, scheduled_at, retry_count,
+		       max_retries, backoff, claimed_at, claimed_by,
+		       heartbeat_at, completed_at, last_error, created_at, updated_at
+		FROM jobs
+		WHERE id = $1 AND user_id = $2`
 
-	row := r.pool.QueryRow(ctx, query, id)
+	row := r.pool.QueryRow(ctx, query, id, userID)
 	return scanJob(row)
 }
 
 func (r *JobRepository) Claim(ctx context.Context, workerID string, limit int) ([]*domain.Job, error) {
-	// This is the core logic of scheduler to prevent double execution of a job
-	// FOR UPDATE SKIP LOCKED will skip rows locked by other processes
+	// FOR UPDATE SKIP LOCKED prevents double-execution across workers.
 	query := `
-                UPDATE jobs
-                SET    status       = 'running',
-                       claimed_at   = NOW(),
-                       claimed_by   = $1,
-                       heartbeat_at = NOW(),
-                       updated_at   = NOW()
-                WHERE id IN (
-                        SELECT id FROM jobs
-                        WHERE  status       = 'pending'
-                          AND  scheduled_at <= NOW()
-                        ORDER BY scheduled_at ASC
-                        LIMIT $2
-                        FOR UPDATE SKIP LOCKED
-                )
-                RETURNING id, idempotency_key, url, method, headers, body,
-                          timeout_seconds, status, scheduled_at, retry_count,
-                          max_retries, backoff, claimed_at, claimed_by,
-                          heartbeat_at, completed_at, last_error, created_at, updated_at`
+		UPDATE jobs
+		SET    status       = 'running',
+		       claimed_at   = NOW(),
+		       claimed_by   = $1,
+		       heartbeat_at = NOW(),
+		       updated_at   = NOW()
+		WHERE id IN (
+			SELECT id FROM jobs
+			WHERE  status       = 'pending'
+			  AND  scheduled_at <= NOW()
+			ORDER BY scheduled_at ASC
+			LIMIT $2
+			FOR UPDATE SKIP LOCKED
+		)
+		RETURNING id, user_id, idempotency_key, url, method, headers, body,
+		          timeout_seconds, status, scheduled_at, retry_count,
+		          max_retries, backoff, claimed_at, claimed_by,
+		          heartbeat_at, completed_at, last_error, created_at, updated_at`
+
 	rows, err := r.pool.Query(ctx, query, workerID, limit)
 	if err != nil {
 		return nil, fmt.Errorf("claim jobs: %w", err)
@@ -108,7 +110,7 @@ func (r *JobRepository) Claim(ctx context.Context, workerID string, limit int) (
 
 func (r *JobRepository) UpdateHeartbeat(ctx context.Context, jobID string) error {
 	_, err := r.pool.Exec(ctx,
-		`UPDATE jobs SET heartbeat_at = NOW(), updated_at = NOW() 
+		`UPDATE jobs SET heartbeat_at = NOW(), updated_at = NOW()
 		WHERE id = $1 AND status = 'running'`, jobID)
 	return err
 }
@@ -116,14 +118,14 @@ func (r *JobRepository) UpdateHeartbeat(ctx context.Context, jobID string) error
 func (r *JobRepository) Complete(ctx context.Context, jobID string) error {
 	_, err := r.pool.Exec(ctx,
 		`UPDATE jobs SET status = 'completed', completed_at = NOW(), updated_at = NOW()
-                 WHERE id = $1`, jobID)
+		WHERE id = $1`, jobID)
 	return err
 }
 
 func (r *JobRepository) Fail(ctx context.Context, jobID string, lastError string) error {
 	_, err := r.pool.Exec(ctx,
 		`UPDATE jobs SET status = 'failed', last_error = $2, updated_at = NOW()
-                 WHERE id = $1`, jobID, lastError)
+		WHERE id = $1`, jobID, lastError)
 	return err
 }
 
@@ -131,15 +133,15 @@ func (r *JobRepository) Reschedule(ctx context.Context, jobID string, lastError 
 	// make sure that retry_count is not over-incremented due to multiple workers trying to re-schedule same jobs
 	_, err := r.pool.Exec(ctx,
 		`UPDATE jobs
-                 SET    status       = 'pending',
-                        retry_count  = retry_count + 1,
-                        last_error   = $2,
-                        scheduled_at = $3,
-                        claimed_at   = NULL,
-                        claimed_by   = NULL,
-                        heartbeat_at = NULL,
-                        updated_at   = NOW()
-                 WHERE id = $1`, jobID, lastError, retryAt)
+		SET    status       = 'pending',
+		       retry_count  = retry_count + 1,
+		       last_error   = $2,
+		       scheduled_at = $3,
+		       claimed_at   = NULL,
+		       claimed_by   = NULL,
+		       heartbeat_at = NULL,
+		       updated_at   = NOW()
+		WHERE id = $1`, jobID, lastError, retryAt)
 	return err
 }
 
@@ -183,16 +185,16 @@ func (r *JobRepository) FailStale(ctx context.Context, staleCutoff time.Time, li
 	return int(tag.RowsAffected()), err
 }
 
-// pgx.Row and pgx.Rows both implement this
+// pgx.Row and pgx.Rows both implement this.
 type rowScanner interface {
 	Scan(dest ...any) error
 }
 
-// scanJob is a private helper — avoids repeating Scan calls across multiple queries
+// scanJob is a private helper — avoids repeating Scan calls across multiple queries.
 func scanJob(row rowScanner) (*domain.Job, error) {
 	var j domain.Job
 	err := row.Scan(
-		&j.ID, &j.IdempotencyKey, &j.URL, &j.Method, &j.Headers, &j.Body,
+		&j.ID, &j.UserID, &j.IdempotencyKey, &j.URL, &j.Method, &j.Headers, &j.Body,
 		&j.TimeoutSeconds, &j.Status, &j.ScheduledAt, &j.RetryCount,
 		&j.MaxRetries, &j.Backoff, &j.ClaimedAt, &j.ClaimedBy,
 		&j.HeartbeatAt, &j.CompletedAt, &j.LastError, &j.CreatedAt, &j.UpdatedAt,

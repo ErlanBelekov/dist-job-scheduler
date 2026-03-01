@@ -29,6 +29,7 @@ const (
 
 type Job struct {
 	ID             string            `json:"id"`
+	UserID         string            `json:"userID"`
 	IdempotencyKey string            `json:"idempotencyKey"`
 	URL            string            `json:"url"`
 	Method         string            `json:"method"`

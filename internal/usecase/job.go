@@ -18,6 +18,7 @@ func NewJobUsecase(repo repository.JobRepository) *JobUsecase {
 }
 
 type CreateJobInput struct {
+	UserID         string
 	IdempotencyKey string
 	URL            string
 	Method         string
@@ -45,6 +46,7 @@ func (u *JobUsecase) CreateJob(ctx context.Context, input CreateJobInput) (*doma
 	}
 
 	job := &domain.Job{
+		UserID:         input.UserID,
 		IdempotencyKey: input.IdempotencyKey,
 		URL:            input.URL,
 		Method:         input.Method,
@@ -65,8 +67,8 @@ func (u *JobUsecase) CreateJob(ctx context.Context, input CreateJobInput) (*doma
 	return created, nil
 }
 
-func (u *JobUsecase) GetByID(ctx context.Context, jobID string) (*domain.Job, error) {
-	job, err := u.repo.GetByID(ctx, jobID)
+func (u *JobUsecase) GetByID(ctx context.Context, jobID, userID string) (*domain.Job, error) {
+	job, err := u.repo.GetByID(ctx, jobID, userID)
 	if err != nil {
 		return nil, fmt.Errorf("get job: %w", err)
 	}

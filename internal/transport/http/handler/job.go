@@ -55,6 +55,7 @@ func (h *JobHandler) Create(ctx *gin.Context) {
 	}
 
 	job, err := h.jobUsecase.CreateJob(ctx.Request.Context(), usecase.CreateJobInput{
+		UserID:         ctx.GetString("userID"),
 		IdempotencyKey: req.IdempotencyKey,
 		URL:            req.URL,
 		Method:         req.Method,
@@ -67,11 +68,11 @@ func (h *JobHandler) Create(ctx *gin.Context) {
 	})
 	if err != nil {
 		if errors.Is(err, domain.ErrDuplicateJob) {
-			ctx.JSON(http.StatusBadRequest, gin.H{"error": domain.ErrDuplicateJob.Error()})
+			ctx.JSON(http.StatusBadRequest, gin.H{"error": errDuplicateJob})
 			return
 		}
 		h.logger.Error("create job", "error", err)
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": errInternalServer})
 		return
 	}
 
@@ -84,14 +85,14 @@ func (h *JobHandler) Create(ctx *gin.Context) {
 func (h *JobHandler) GetByID(ctx *gin.Context) {
 	jobID := ctx.Param("id")
 
-	job, err := h.jobUsecase.GetByID(ctx.Request.Context(), jobID)
+	job, err := h.jobUsecase.GetByID(ctx.Request.Context(), jobID, ctx.GetString("userID"))
 	if err != nil {
 		if errors.Is(err, domain.ErrJobNotFound) {
-			ctx.JSON(http.StatusNotFound, gin.H{"error": "job not found"})
+			ctx.JSON(http.StatusNotFound, gin.H{"error": errJobNotFound})
 			return
 		}
 		h.logger.Error("get job by id", "job_id", jobID, "error", err)
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": errInternalServer})
 		return
 	}
 
