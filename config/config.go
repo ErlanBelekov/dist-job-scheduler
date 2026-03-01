@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"log/slog"
 
 	"github.com/caarlos0/env/v11"
 	"github.com/go-playground/validator/v10"
@@ -16,6 +17,7 @@ type Config struct {
 	PollIntervalSec int    `env:"POLL_INTERVAL_SEC" envDefault:"1" validate:"min=1,max=60"`
 
 	MetricsPort string `env:"METRICS_PORT" envDefault:"9090"`
+	LogLevel    string `env:"LOG_LEVEL" envDefault:"info" validate:"required,oneof=debug info warn error"`
 
 	JWTSecret     string `env:"JWT_SECRET,required"   validate:"required,min=32"`
 	ResendAPIKey  string `env:"RESEND_API_KEY"         validate:"required_if=Env production,required_if=Env staging"`
@@ -35,4 +37,18 @@ func Load() (*Config, error) {
 	}
 
 	return cfg, nil
+}
+
+// SlogLevel converts the LOG_LEVEL string to a slog.Level.
+func (c *Config) SlogLevel() slog.Level {
+	switch c.LogLevel {
+	case "debug":
+		return slog.LevelDebug
+	case "warn":
+		return slog.LevelWarn
+	case "error":
+		return slog.LevelError
+	default:
+		return slog.LevelInfo
+	}
 }

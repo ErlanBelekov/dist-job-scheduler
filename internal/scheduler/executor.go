@@ -5,19 +5,22 @@ import (
 	"crypto/tls"
 	"fmt"
 	"io"
+	"log/slog"
 	"net"
 	"net/http"
 	"strings"
 	"time"
 
 	"github.com/ErlanBelekov/dist-job-scheduler/internal/domain"
+	"github.com/ErlanBelekov/dist-job-scheduler/internal/requestid"
 )
 
 type Executor struct {
 	client *http.Client
+	logger *slog.Logger
 }
 
-func NewExecutor() *Executor {
+func NewExecutor(logger *slog.Logger) *Executor {
 	return &Executor{
 		client: &http.Client{
 			// Per-job timeouts are set via context; this is a safety net.
@@ -41,6 +44,7 @@ func NewExecutor() *Executor {
 				return nil
 			},
 		},
+		logger: logger.With("component", "executor"),
 	}
 }
 
@@ -70,12 +74,34 @@ func (e *Executor) Run(ctx context.Context, job *domain.Job) ExecutionResult {
 		req.Header.Set(k, v)
 	}
 
+	reqID := requestid.New()
+	req.Header.Set("X-Request-ID", reqID)
+	ctx = requestid.WithRequestID(ctx, reqID)
+
+	e.logger.InfoContext(ctx, "sending request",
+		"job_id", job.ID,
+		"method", job.Method,
+		"url", job.URL,
+	)
+
 	resp, err := e.client.Do(req)
 	if err != nil {
+		e.logger.ErrorContext(ctx, "request failed",
+			"job_id", job.ID,
+			"error", err,
+			"duration", time.Since(start),
+		)
 		return ExecutionResult{Err: fmt.Errorf("do request: %w", err), Duration: time.Since(start)}
 	}
 	defer func() { _ = resp.Body.Close() }()
 	_, _ = io.Copy(io.Discard, resp.Body) // drain so the connection can be reused by the pool
 
-	return ExecutionResult{StatusCode: resp.StatusCode, Duration: time.Since(start)}
+	duration := time.Since(start)
+	e.logger.InfoContext(ctx, "received response",
+		"job_id", job.ID,
+		"status", resp.StatusCode,
+		"duration", duration,
+	)
+
+	return ExecutionResult{StatusCode: resp.StatusCode, Duration: duration}
 }

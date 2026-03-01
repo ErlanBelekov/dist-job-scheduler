@@ -43,7 +43,7 @@ func (h *AuthHandler) RequestMagicLink(c *gin.Context) {
 	}
 
 	if err := h.authUsecase.RequestMagicLink(c.Request.Context(), req.Email); err != nil {
-		h.logger.Error("request magic link", "error", err)
+		h.logger.ErrorContext(c.Request.Context(), "request magic link", "error", err)
 	}
 
 	c.Status(http.StatusOK)
@@ -61,7 +61,7 @@ func (h *AuthHandler) Verify(c *gin.Context) {
 	jwtToken, err := h.authUsecase.VerifyMagicLink(c.Request.Context(), rawToken)
 	if err != nil {
 		if !errors.Is(err, domain.ErrTokenInvalid) {
-			h.logger.Error("verify magic link", "error", err)
+			h.logger.ErrorContext(c.Request.Context(), "verify magic link", "error", err)
 		}
 		c.JSON(http.StatusUnauthorized, gin.H{"error": errTokenInvalid})
 		return
