@@ -1,0 +1,57 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: server
+  namespace: dist-scheduler
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: server
+  template:
+    metadata:
+      labels:
+        app: server
+    spec:
+      imagePullSecrets:
+        - name: gcr-pull
+      containers:
+        - name: server
+          image: europe-west3-docker.pkg.dev/notifylm/dist-scheduler/server:latest
+          ports:
+            - containerPort: 8080
+          envFrom:
+            - configMapRef:
+                name: dist-scheduler
+            - secretRef:
+                name: dist-scheduler
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+          readinessProbe:
+            tcpSocket:
+              port: 8080
+            initialDelaySeconds: 3
+            periodSeconds: 5
+          livenessProbe:
+            tcpSocket:
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: server
+  namespace: dist-scheduler
+spec:
+  type: ClusterIP
+  selector:
+    app: server
+  ports:
+    - port: 8080
+      targetPort: 8080

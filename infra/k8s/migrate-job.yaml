@@ -1,0 +1,23 @@
+# To re-run: kubectl delete job migrate -n dist-scheduler && kubectl apply -f migrate-job.yaml
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: migrate
+  namespace: dist-scheduler
+spec:
+  backoffLimit: 3
+  template:
+    spec:
+      restartPolicy: OnFailure
+      imagePullSecrets:
+        - name: gcr-pull
+      containers:
+        - name: migrate
+          image: europe-west3-docker.pkg.dev/notifylm/dist-scheduler/migrate:latest
+          env:
+            - name: GOOSE_DBSTRING
+              valueFrom:
+                secretKeyRef:
+                  name: dist-scheduler
+                  key: DATABASE_URL
+          command: ["/goose", "-dir", "/migrations", "postgres", "$(GOOSE_DBSTRING)", "up"]
