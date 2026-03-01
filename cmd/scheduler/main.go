@@ -45,6 +45,7 @@ func main() {
 
 	jobRepo := postgres.NewJobRepository(pool)
 	attemptRepo := postgres.NewAttemptRepository(pool)
+	scheduleRepo := postgres.NewScheduleRepository(pool, logger)
 
 	worker := scheduler.NewWorker(
 		jobRepo,
@@ -58,6 +59,9 @@ func main() {
 	// heartbeat fires every 10s — 30s timeout means 3 missed beats before a job is stale
 	reaper := scheduler.NewReaper(jobRepo, logger, 30*time.Second, 30*time.Second)
 	go reaper.Start(ctx)
+
+	dispatcher := scheduler.NewDispatcher(scheduleRepo, logger, time.Duration(cfg.DispatchIntervalSec)*time.Second)
+	go dispatcher.Start(ctx)
 
 	metricsSrv := metrics.NewServer(":"+cfg.MetricsPort, checker)
 	go func() {

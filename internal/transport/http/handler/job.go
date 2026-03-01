@@ -46,6 +46,7 @@ type getJobResponse struct {
 	UpdatedAt   time.Time     `json:"updated_at"`
 	CompletedAt *time.Time    `json:"completed_at,omitempty"`
 	LastError   *string       `json:"last_error,omitempty"`
+	ScheduleID  *string       `json:"schedule_id,omitempty"`
 }
 
 type listJobItem struct {
@@ -57,6 +58,7 @@ type listJobItem struct {
 	CreatedAt   time.Time     `json:"created_at"`
 	CompletedAt *time.Time    `json:"completed_at,omitempty"`
 	LastError   *string       `json:"last_error,omitempty"`
+	ScheduleID  *string       `json:"schedule_id,omitempty"`
 }
 
 type listJobsResponse struct {
@@ -126,6 +128,7 @@ func (h *JobHandler) List(ctx *gin.Context) {
 			CreatedAt:   j.CreatedAt,
 			CompletedAt: j.CompletedAt,
 			LastError:   j.LastError,
+			ScheduleID:  j.ScheduleID,
 		}
 	}
 	ctx.JSON(http.StatusOK, listJobsResponse{
@@ -222,5 +225,6 @@ func (h *JobHandler) GetByID(ctx *gin.Context) {
 		UpdatedAt:   job.UpdatedAt,
 		CompletedAt: job.CompletedAt,
 		LastError:   job.LastError,
+		ScheduleID:  job.ScheduleID,
 	})
 }

@@ -52,6 +52,8 @@ type Job struct {
 	CompletedAt *time.Time `json:"completedAt"`
 	LastError   *string    `json:"lastError"`
 
+	ScheduleID *string `json:"scheduleID,omitempty"`
+
 	CreatedAt time.Time `json:"createdAt"`
 	UpdatedAt time.Time `json:"updatedAt"`
 }

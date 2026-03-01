@@ -12,6 +12,7 @@ require (
 	github.com/lmittmann/tint v1.1.3
 	github.com/prometheus/client_golang v1.23.2
 	github.com/resend/resend-go/v2 v2.28.0
+	github.com/robfig/cron/v3 v3.0.1
 	github.com/samber/slog-gin v1.21.0
 )
 

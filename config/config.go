@@ -12,9 +12,10 @@ type Config struct {
 	Env  string `env:"ENV" envDefault:"local" validate:"required,oneof=local staging production"`
 	Port string `env:"PORT" envDefault:"8080" validate:"required"`
 
-	DatabaseURL     string `env:"DATABASE_URL,required" validate:"required"`
-	WorkerCount     int    `env:"WORKER_COUNT" envDefault:"5" validate:"min=1,max=100"`
-	PollIntervalSec int    `env:"POLL_INTERVAL_SEC" envDefault:"1" validate:"min=1,max=60"`
+	DatabaseURL        string `env:"DATABASE_URL,required" validate:"required"`
+	WorkerCount        int    `env:"WORKER_COUNT" envDefault:"5" validate:"min=1,max=100"`
+	PollIntervalSec    int    `env:"POLL_INTERVAL_SEC" envDefault:"1" validate:"min=1,max=60"`
+	DispatchIntervalSec int   `env:"DISPATCH_INTERVAL_SEC" envDefault:"5" validate:"min=1,max=60"`
 
 	MetricsPort string `env:"METRICS_PORT" envDefault:"9090"`
 	LogLevel    string `env:"LOG_LEVEL" envDefault:"info" validate:"required,oneof=debug info warn error"`

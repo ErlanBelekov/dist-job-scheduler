@@ -7,4 +7,10 @@ const (
 	errTokenInvalid   = "Token is invalid or expired"
 	errInvalidStatus     = "Invalid status value"
 	errJobNotCancellable = "Job cannot be cancelled in its current state"
+
+	errScheduleNotFound      = "Schedule not found"
+	errInvalidCronExpr       = "Invalid cron expression"
+	errScheduleNameConflict  = "Schedule with this name already exists"
+	errScheduleAlreadyPaused = "Schedule is already paused"
+	errScheduleNotPaused     = "Schedule is not paused"
 )

@@ -34,4 +34,6 @@ type JobRepository interface {
 	// Reaper methods — recover jobs from crashed workers
 	RescheduleStale(ctx context.Context, staleCutoff time.Time, limit int) (int, error)
 	FailStale(ctx context.Context, staleCutoff time.Time, limit int) (int, error)
+
+	ListByScheduleID(ctx context.Context, scheduleID string, limit int, cursorTime *time.Time, cursorID string) ([]*domain.Job, error)
 }

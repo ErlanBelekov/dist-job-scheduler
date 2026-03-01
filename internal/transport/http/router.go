@@ -10,7 +10,7 @@ import (
 	sloggin "github.com/samber/slog-gin"
 )
 
-func NewRouter(logger *slog.Logger, jobHandler *handler.JobHandler, authHandler *handler.AuthHandler, jwtKey []byte) *gin.Engine {
+func NewRouter(logger *slog.Logger, jobHandler *handler.JobHandler, authHandler *handler.AuthHandler, scheduleHandler *handler.ScheduleHandler, jwtKey []byte) *gin.Engine {
 	r := gin.New()
 	r.Use(gin.Recovery())
 	r.Use(middleware.RequestID())
@@ -29,6 +29,16 @@ func NewRouter(logger *slog.Logger, jobHandler *handler.JobHandler, authHandler 
 	jobs.GET("/:id", jobHandler.GetByID)
 	jobs.DELETE("/:id", jobHandler.Cancel)
 	jobs.GET("/:id/attempts", jobHandler.ListAttempts)
+
+	// Protected schedule routes
+	schedules := r.Group("/schedules", middleware.Auth(jwtKey))
+	schedules.POST("", scheduleHandler.Create)
+	schedules.GET("", scheduleHandler.List)
+	schedules.GET("/:id", scheduleHandler.GetByID)
+	schedules.POST("/:id/pause", scheduleHandler.Pause)
+	schedules.POST("/:id/resume", scheduleHandler.Resume)
+	schedules.DELETE("/:id", scheduleHandler.Delete)
+	schedules.GET("/:id/jobs", scheduleHandler.ListJobs)
 
 	return r
 }

@@ -52,6 +52,11 @@ func main() {
 	jobUsecase := usecase.NewJobUsecase(jobRepo, attemptRepo)
 	jobHandler := handler.NewJobHandler(jobUsecase, logger)
 
+	// Schedules
+	scheduleRepo := postgres.NewScheduleRepository(pool, logger)
+	scheduleUsecase := usecase.NewScheduleUsecase(scheduleRepo, jobRepo)
+	scheduleHandler := handler.NewScheduleHandler(scheduleUsecase, logger)
+
 	// Auth
 	userRepo := postgres.NewUserRepository(pool)
 	emailSender := email.NewSender(cfg.Env, cfg.ResendAPIKey, cfg.ResendFrom, logger)
@@ -63,7 +68,7 @@ func main() {
 
 	srv := http.Server{
 		Addr:    ":" + cfg.Port,
-		Handler: httptransport.NewRouter(logger, jobHandler, authHandler, []byte(cfg.JWTSecret)),
+		Handler: httptransport.NewRouter(logger, jobHandler, authHandler, scheduleHandler, []byte(cfg.JWTSecret)),
 	}
 
 	metricsSrv := metrics.NewServer(":"+cfg.MetricsPort, checker)

@@ -26,12 +26,12 @@ func (r *JobRepository) Create(ctx context.Context, job *domain.Job) (*domain.Jo
 	query := `
 		INSERT INTO jobs (
 			user_id, idempotency_key, url, method, headers, body,
-			timeout_seconds, status, scheduled_at, max_retries, backoff
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+			timeout_seconds, status, scheduled_at, max_retries, backoff, schedule_id
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
 		RETURNING id, user_id, idempotency_key, url, method, headers, body,
 		          timeout_seconds, status, scheduled_at, retry_count,
 		          max_retries, backoff, claimed_at, claimed_by,
-		          heartbeat_at, completed_at, last_error, created_at, updated_at`
+		          heartbeat_at, completed_at, last_error, created_at, updated_at, schedule_id`
 
 	row := r.pool.QueryRow(ctx, query,
 		job.UserID,
@@ -45,6 +45,7 @@ func (r *JobRepository) Create(ctx context.Context, job *domain.Job) (*domain.Jo
 		job.ScheduledAt,
 		job.MaxRetries,
 		job.Backoff,
+		job.ScheduleID,
 	)
 
 	created, err := scanJob(row)
@@ -63,7 +64,7 @@ func (r *JobRepository) GetByID(ctx context.Context, id, userID string) (*domain
 		SELECT id, user_id, idempotency_key, url, method, headers, body,
 		       timeout_seconds, status, scheduled_at, retry_count,
 		       max_retries, backoff, claimed_at, claimed_by,
-		       heartbeat_at, completed_at, last_error, created_at, updated_at
+		       heartbeat_at, completed_at, last_error, created_at, updated_at, schedule_id
 		FROM jobs
 		WHERE id = $1 AND user_id = $2`
 
@@ -91,7 +92,7 @@ func (r *JobRepository) Claim(ctx context.Context, workerID string, limit int) (
 		RETURNING id, user_id, idempotency_key, url, method, headers, body,
 		          timeout_seconds, status, scheduled_at, retry_count,
 		          max_retries, backoff, claimed_at, claimed_by,
-		          heartbeat_at, completed_at, last_error, created_at, updated_at`
+		          heartbeat_at, completed_at, last_error, created_at, updated_at, schedule_id`
 
 	rows, err := r.pool.Query(ctx, query, workerID, limit)
 	if err != nil {
@@ -222,7 +223,7 @@ func (r *JobRepository) ListJobs(ctx context.Context, input repository.ListJobsI
 		SELECT id, user_id, idempotency_key, url, method, headers, body,
 		       timeout_seconds, status, scheduled_at, retry_count,
 		       max_retries, backoff, claimed_at, claimed_by,
-		       heartbeat_at, completed_at, last_error, created_at, updated_at
+		       heartbeat_at, completed_at, last_error, created_at, updated_at, schedule_id
 		FROM jobs
 		WHERE %s
 		ORDER BY scheduled_at DESC, id DESC
@@ -259,6 +260,7 @@ func scanJob(row rowScanner) (*domain.Job, error) {
 		&j.TimeoutSeconds, &j.Status, &j.ScheduledAt, &j.RetryCount,
 		&j.MaxRetries, &j.Backoff, &j.ClaimedAt, &j.ClaimedBy,
 		&j.HeartbeatAt, &j.CompletedAt, &j.LastError, &j.CreatedAt, &j.UpdatedAt,
+		&j.ScheduleID,
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -267,4 +269,42 @@ func scanJob(row rowScanner) (*domain.Job, error) {
 		return nil, fmt.Errorf("scan job: %w", err)
 	}
 	return &j, nil
+}
+
+func (r *JobRepository) ListByScheduleID(ctx context.Context, scheduleID string, limit int, cursorTime *time.Time, cursorID string) ([]*domain.Job, error) {
+	args := []any{scheduleID}
+	where := []string{"schedule_id = $1"}
+
+	if cursorTime != nil {
+		args = append(args, *cursorTime, cursorID)
+		where = append(where, fmt.Sprintf("(scheduled_at, id) < ($%d, $%d)", len(args)-1, len(args)))
+	}
+	args = append(args, limit)
+
+	query := fmt.Sprintf(`
+		SELECT id, user_id, idempotency_key, url, method, headers, body,
+		       timeout_seconds, status, scheduled_at, retry_count,
+		       max_retries, backoff, claimed_at, claimed_by,
+		       heartbeat_at, completed_at, last_error, created_at, updated_at, schedule_id
+		FROM jobs
+		WHERE %s
+		ORDER BY scheduled_at DESC, id DESC
+		LIMIT $%d`,
+		strings.Join(where, " AND "), len(args))
+
+	rows, err := r.pool.Query(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("list jobs by schedule id: %w", err)
+	}
+	defer rows.Close()
+
+	var jobs []*domain.Job
+	for rows.Next() {
+		j, err := scanJob(rows)
+		if err != nil {
+			return nil, err
+		}
+		jobs = append(jobs, j)
+	}
+	return jobs, nil
 }
