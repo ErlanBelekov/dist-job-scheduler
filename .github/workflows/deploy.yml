@@ -59,6 +59,16 @@ jobs:
           echo "${{ secrets.KUBECONFIG_DATA }}" | base64 -d > ~/.kube/config
           chmod 600 ~/.kube/config
 
+      - name: Apply monitoring stack
+        run: |
+          kubectl apply -f infra/k8s/monitoring/namespace.yaml
+          kubectl apply -f infra/k8s/monitoring/traefik-metrics.yaml
+          kubectl apply -f infra/k8s/monitoring/prometheus.yaml
+          kubectl apply -f infra/k8s/monitoring/loki.yaml
+          kubectl apply -f infra/k8s/monitoring/promtail.yaml
+          kubectl apply -f infra/k8s/monitoring/grafana.yaml
+          kubectl apply -f infra/k8s/monitoring/ingress.yaml
+
       - name: Apply manifests
         run: |
           kubectl apply -f infra/k8s/namespace.yaml
