@@ -1,42 +1,106 @@
-# Overview
+# dist-job-scheduler
 
-Distributed job scheduler for serverless HTTP and gRPC messaging, written in Go.
+A distributed HTTP job scheduler. Clients POST a job with a target URL, method, headers, body, and a UTC fire time. Workers claim and execute them with sub-2s latency; failed jobs retry with configurable exponential or linear backoff.
 
-Functionality:
+## What's built
 
-- schedule a job for execution at a specific time with <1-2s latency
-- execute pending jobs exactly once
-- automatic retries with backoff
-- get metadata about jobs and executions
-- multiple transports: REST API and gRPC
+| Area | Status |
+|---|---|
+| Job scheduling — create, claim, execute, retry | ✅ Done |
+| Exactly-once execution (FOR UPDATE SKIP LOCKED + reaper) | ✅ Done |
+| Crash recovery (heartbeat + reaper process) | ✅ Done |
+| Magic-link authentication + JWT | ✅ Done |
+| Per-user job isolation (ownership enforced at query level) | ✅ Done |
+| CI pipeline (lint, tests, migrations against real Postgres) | ✅ Done |
 
-Stack:
+## System map
 
-- Go
-- PostgreSQL
-- gin
-- pgx
-- goose for migrations
+```
+[ Client ]
+    │  REST API
+    ▼
+[ server ]  ──────────────────────────────────┐
+    │                                         │
+    ▼                                         ▼
+[ PostgreSQL ] ◄──────────────── [ scheduler ]
+                                  Worker + Reaper + Executor
+```
 
-Thinking about the plan for implementation:
+Future state (see Roadmap below):
 
-- basic Job CRUD and scheduler with locks
-- authentication(magic links)
-- store execution history of each job
-- exactly-once execution(prevent race conditions and multiple executions of a single job, I think we already have that with the DB locking now and reaper process)
-- endpoints to query data for front-end: jobs, executions of each job
+```
+[ Browser ]
+    │
+    ▼
+[ Frontend ]
+    │  GraphQL
+    ▼
+[ GraphQL Gateway ]
+    │  REST
+    ▼
+[ server ]  ──── [ PostgreSQL ] ──── [ scheduler ]
+```
 
-Add Later:
+## Stack
 
-- CI/CD pipeline with linting, tests, migrations
-- OpenTelemetry, Prometheus, Grafana for monitoring and observability
-- Dockerize
-- Deploy to GCP K8S, add staging + prod envs, modify CI/CD, add Terraform(Enkidu)
+| Concern | Choice |
+|---|---|
+| Language | Go 1.25 |
+| Web framework | Gin |
+| Database | PostgreSQL via `pgx/v5` |
+| Migrations | goose |
+| Auth | Magic links → JWT HS256; email via Resend (logged locally) |
+| Config | `caarlos0/env` — struct tags, no `.env` files in Go code |
+| Linter | golangci-lint v2 |
 
-# Metrics to implement later, can be useful probably at bigger scale:
+## Local dev
 
-- amount of times the schedulers shut down
-- average life of a single scheduler worker instance
-- latency between creation of job and scheduler picking it up(when its status changes to "running")
-- average client server latency, error rate, etc
-- amount of jobs picked up by reaper(failed scheduler executions) and amount of jobs processed within scheduler. In perfect world, < 1% of jobs should be picked by reaper
+```bash
+# Prerequisites: Docker, direnv, goose
+eval "$(direnv hook zsh)"   # if not already in ~/.zshrc
+
+docker compose up -d postgres
+direnv allow
+goose -dir ./migrations postgres "$DATABASE_URL" up
+
+go run ./cmd/server        # terminal 1
+go run ./cmd/scheduler     # terminal 2
+```
+
+See `CLAUDE.md` for the full local setup guide, auth flow walkthrough, and coding conventions.
+
+---
+
+## Roadmap
+
+### Phase 1 — Core backend ✅
+- Job CRUD, worker, reaper, retry with backoff
+- Exactly-once execution via Postgres row-level locking
+- Magic-link auth + JWT; jobs scoped to authenticated users
+- CI: lint + test + migrations on every PR
+
+### Phase 2 — Deployment 🔄 In progress
+- Docker images (already present: `Dockerfile.server`, `Dockerfile.scheduler`, `Dockerfile.migrate`)
+- Deploy to K8S on rented VM
+- Staging and production environments
+- Terraform for infra provisioning (Enkidu)
+
+### Phase 3 — Observability
+- OpenTelemetry instrumentation (traces + metrics)
+- Prometheus + Grafana dashboards
+- Key metrics to track:
+  - Job pickup latency (created → running)
+  - Reaper rescue rate (target: <1% of jobs)
+  - Worker instance lifetime and shutdown count
+  - API error rate and p99 latency
+
+### Phase 4 — Frontend & GraphQL gateway
+- **Frontend repo** — separate repository, TBD stack
+- **GraphQL gateway** — sits between the frontend and core services; aggregates and shapes data for UI consumption
+- Additional API endpoints needed before gateway:
+  - Execution history per job
+  - Job listing with filters (status, date range)
+
+### Phase 5 — Documentation site
+- Public-facing docs for the scheduler API
+- Planned for after the frontend and gateway are stable
