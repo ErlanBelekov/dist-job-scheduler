@@ -58,10 +58,13 @@ Each worker gets a disjoint set of jobs. No duplicates, no coordination overhead
 - Both queries use `FOR UPDATE SKIP LOCKED` so multiple reaper replicas are safe
 
 ### Structured logging with `slog`
-- `TextHandler` in `ENV=local`, `JSONHandler` in staging/production (Datadog/Cloud Logging parseable)
+- Tinted logger (`lmittmann/tint`) in `ENV=local`, `JSONHandler` in staging/production (Datadog/Cloud Logging parseable)
+- Log level is configurable via `LOG_LEVEL` env var (`debug`, `info`, `warn`, `error`; default `info`)
 - Logger created once in `main`, injected into every constructor
 - Components pre-tag their logger: `logger.With("component", "job_handler")`
 - Levels: `Info` for normal flow, `Warn` for retryable failures, `Error` for unexpected errors
+- **Always use `*Context` methods** (`InfoContext`, `ErrorContext`, `WarnContext`, `DebugContext`) — never `Info`, `Error`, `Warn`, `Debug`. A custom `ContextHandler` (`internal/log`) wraps every logger and auto-extracts `request_id` from the context. Using the non-context variants loses request correlation.
+- Request IDs are generated per inbound HTTP request (`internal/requestid` + `middleware.RequestID()`) and per outbound executor call. They are stored in context via `requestid.WithRequestID` and returned in the `X-Request-ID` response header.
 
 ### Graceful shutdown
 - `signal.NotifyContext` for SIGINT/SIGTERM
@@ -105,6 +108,7 @@ Each worker gets a disjoint set of jobs. No duplicates, no coordination overhead
 | Migrations | goose (`-- +goose Up` annotations) |
 | Config | `caarlos0/env` — struct tags, no `.env` files in Go code |
 | Auth | Magic links → JWT HS256 (`golang-jwt/jwt/v5`); email via Resend (`resend-go/v2`) |
+| Logging | `log/slog` + `lmittmann/tint` (local) + custom `ContextHandler` (`internal/log`) |
 | Linter | golangci-lint v2 (`errcheck`, `govet`+shadow, `staticcheck`, `unused`, `ineffassign`, `bodyclose`, `noctx`, `exhaustive`, `gocritic`) |
 
 ## Local dev
@@ -134,6 +138,7 @@ Required env vars (already in `.envrc` for local):
 | `MAGIC_LINK_BASE_URL` | `http://localhost:8080` | base for verify links in emails |
 | `RESEND_API_KEY` | not required locally | required in staging/production |
 | `RESEND_FROM` | not required locally | required in staging/production |
+| `LOG_LEVEL` | `info` | `debug`, `info`, `warn`, `error` |
 
 ### Seeding dev data
 
