@@ -4,5 +4,5 @@
 .env
 .env.*
 
-# Kubernetes secrets (contains credentials)
-infra/k8s/secrets.yaml
+# age private key (never commit)
+keys.txt
