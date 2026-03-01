@@ -102,8 +102,12 @@ func (w *Worker) runJob(ctx context.Context, job *domain.Job) {
 		StartedAt:  startedAt,
 	})
 	if err != nil {
-		w.logger.Error("create attempt record", "job_id", job.ID, "error", err)
-		// non-fatal: still execute the job, just won't have history for this run
+		// Fatal: if the DB is unhealthy enough to reject this write, all subsequent
+		// writes (Complete/Reschedule/Fail) will fail too. Return now — the job
+		// stays in "running" status, the heartbeat stops, and the reaper will
+		// reschedule it to "pending" after the stale cutoff.
+		w.logger.Error("create attempt record, aborting run — reaper will reschedule", "job_id", job.ID, "error", err)
+		return
 	}
 
 	heartbeatCtx, cancelHeartbeat := context.WithCancel(ctx)
@@ -158,11 +162,7 @@ func (w *Worker) runJob(ctx context.Context, job *domain.Job) {
 }
 
 // closeAttempt writes the execution outcome to the attempt record.
-// It is a no-op when attempt is nil (i.e. CreateAttempt failed earlier).
 func (w *Worker) closeAttempt(ctx context.Context, attempt *domain.JobAttempt, statusCode *int, errMsg *string, durationMS int64) {
-	if attempt == nil {
-		return
-	}
 	if err := w.attempts.CompleteAttempt(ctx, attempt.ID, statusCode, errMsg, durationMS); err != nil {
 		w.logger.Error("complete attempt record", "job_id", attempt.JobID, "error", err)
 	}

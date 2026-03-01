@@ -207,7 +207,7 @@ The raw token is never stored — only its SHA-256 hash. `ClaimMagicToken` is a 
 ### Two-phase attempt writes (open before execute, close after)
 `CreateAttempt` is called before `executor.Run`, `CompleteAttempt` after. If a worker crashes mid-execution the attempt row stays in the DB with `completed_at = NULL` — immediately visible in `GET /jobs/:id/attempts` as an incomplete run. This is intentional: it gives operators a signal that a worker died holding this job, even before the reaper reschedules it.
 
-`CreateAttempt` failure is non-fatal — the job still executes, just without a history record for that run. Never let observability writes block execution.
+`CreateAttempt` failure is **fatal** — `runJob` returns immediately, the job stays in `running` status, the heartbeat stops, and the reaper reschedules it to `pending` after the stale cutoff. Rationale: attempt records are user-facing frontend data; executing without one leaves the user blind. More importantly, if the DB rejected this write, every subsequent write (Complete/Reschedule/Fail) would fail too — proceeding only wastes the attempt.
 
 ### Never wrap HTTP calls in a DB transaction
 Job execution (the outbound HTTP call) cannot be transactional. Holding a Postgres connection open for up to `timeout_seconds` (default 30s, max 3600s) while waiting for an external endpoint would starve the connection pool under any real concurrency. Each DB write in `runJob` is independent and failures are handled locally or by the reaper.
