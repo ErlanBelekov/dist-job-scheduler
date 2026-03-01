@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/ErlanBelekov/dist-job-scheduler/internal/domain"
+	"github.com/ErlanBelekov/dist-job-scheduler/internal/metrics"
 	"github.com/ErlanBelekov/dist-job-scheduler/internal/repository"
 )
 
@@ -47,6 +48,8 @@ func NewWorker(
 }
 
 func (w *Worker) Start(ctx context.Context) {
+	metrics.WorkerStartTime.SetToCurrentTime()
+
 	ticker := time.NewTicker(w.pollInterval)
 	defer ticker.Stop()
 
@@ -55,6 +58,7 @@ func (w *Worker) Start(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
+			metrics.WorkerShutdownsTotal.Inc()
 			w.logger.Info("worker shut down")
 			return
 		case <-ticker.C:
@@ -84,6 +88,8 @@ func (w *Worker) processBatch(ctx context.Context) {
 	for _, job := range jobs {
 		w.sem <- struct{}{}
 		go func(j *domain.Job) {
+			metrics.JobsInFlight.Inc()
+			defer metrics.JobsInFlight.Dec()
 			defer func() { <-w.sem }()
 			w.runJob(ctx, j)
 		}(job)
@@ -91,6 +97,8 @@ func (w *Worker) processBatch(ctx context.Context) {
 }
 
 func (w *Worker) runJob(ctx context.Context, job *domain.Job) {
+	metrics.JobPickupLatency.Observe(time.Since(job.CreatedAt).Seconds())
+
 	startedAt := time.Now()
 
 	// Open the attempt record before executing so a worker crash leaves a
@@ -120,6 +128,8 @@ func (w *Worker) runJob(ctx context.Context, job *domain.Job) {
 	durationMS := time.Since(startedAt).Milliseconds()
 
 	if result.Err == nil && result.StatusCode == http.StatusOK {
+		metrics.JobExecutionDuration.WithLabelValues("success").Observe(result.Duration.Seconds())
+		metrics.JobsCompletedTotal.WithLabelValues("success").Inc()
 		w.closeAttempt(ctx, attempt, &result.StatusCode, nil, durationMS)
 		if err := w.repo.Complete(ctx, job.ID); err != nil {
 			w.logger.Error("mark job complete", "job_id", job.ID, "error", err)
@@ -139,6 +149,7 @@ func (w *Worker) runJob(ctx context.Context, job *domain.Job) {
 	if result.StatusCode != 0 {
 		statusCode = &result.StatusCode
 	}
+	metrics.JobExecutionDuration.WithLabelValues("failure").Observe(result.Duration.Seconds())
 	w.closeAttempt(ctx, attempt, statusCode, &errMsg, durationMS)
 
 	if job.RetryCount < job.MaxRetries {
@@ -146,6 +157,7 @@ func (w *Worker) runJob(ctx context.Context, job *domain.Job) {
 		if err := w.repo.Reschedule(ctx, job.ID, errMsg, retryAt); err != nil {
 			w.logger.Error("reschedule job", "job_id", job.ID, "error", err)
 		}
+		metrics.JobsCompletedTotal.WithLabelValues("retry").Inc()
 		w.logger.Warn("job failed, will retry",
 			"job_id", job.ID,
 			"error", errMsg,
@@ -157,6 +169,7 @@ func (w *Worker) runJob(ctx context.Context, job *domain.Job) {
 		if err := w.repo.Fail(ctx, job.ID, errMsg); err != nil {
 			w.logger.Error("mark job failed", "job_id", job.ID, "error", err)
 		}
+		metrics.JobsCompletedTotal.WithLabelValues("failed").Inc()
 		w.logger.Warn("job permanently failed", "job_id", job.ID, "error", errMsg)
 	}
 }

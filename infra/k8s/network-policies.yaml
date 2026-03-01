@@ -62,6 +62,29 @@ spec:
         - port: 9187
           protocol: TCP
 ---
+# Allow Prometheus to scrape metrics from server and scheduler
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-metrics-from-prometheus
+  namespace: dist-scheduler
+spec:
+  podSelector:
+    matchExpressions:
+      - key: app
+        operator: In
+        values: [server, scheduler]
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+      ports:
+        - port: 9090
+          protocol: TCP
+---
 # Default deny all ingress in the monitoring namespace
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy

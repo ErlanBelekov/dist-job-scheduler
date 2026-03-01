@@ -15,6 +15,8 @@ type Config struct {
 	WorkerCount     int    `env:"WORKER_COUNT" envDefault:"5" validate:"min=1,max=100"`
 	PollIntervalSec int    `env:"POLL_INTERVAL_SEC" envDefault:"1" validate:"min=1,max=60"`
 
+	MetricsPort string `env:"METRICS_PORT" envDefault:"9090"`
+
 	JWTSecret     string `env:"JWT_SECRET,required"   validate:"required,min=32"`
 	ResendAPIKey  string `env:"RESEND_API_KEY"         validate:"required_if=Env production,required_if=Env staging"`
 	ResendFrom    string `env:"RESEND_FROM"            validate:"required_if=Env production,required_if=Env staging"`

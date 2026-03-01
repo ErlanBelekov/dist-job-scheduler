@@ -9,3 +9,4 @@ data:
   WORKER_COUNT: "5"
   POLL_INTERVAL_SEC: "1"
   MAGIC_LINK_BASE_URL: "https://job.enkiduck.com"
+  METRICS_PORT: "9090"
