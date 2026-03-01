@@ -15,9 +15,13 @@ spec:
         - name: migrate
           image: europe-west3-docker.pkg.dev/notifylm/dist-scheduler/migrate:latest
           env:
+            - name: GOOSE_DRIVER
+              value: postgres
             - name: GOOSE_DBSTRING
               valueFrom:
                 secretKeyRef:
                   name: dist-scheduler
                   key: DATABASE_URL
-          command: ["/goose", "-dir", "/migrations", "postgres", "$(GOOSE_DBSTRING)", "up"]
+            - name: GOOSE_MIGRATION_DIR
+              value: /migrations
+          command: ["/goose", "up"]
