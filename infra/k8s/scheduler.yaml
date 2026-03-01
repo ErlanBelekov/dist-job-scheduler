@@ -20,6 +20,13 @@ spec:
       containers:
         - name: scheduler
           image: europe-west3-docker.pkg.dev/notifylm/dist-scheduler/scheduler:latest
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 65534
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
           envFrom:
             - configMapRef:
                 name: dist-scheduler

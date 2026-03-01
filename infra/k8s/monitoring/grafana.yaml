@@ -6,7 +6,8 @@ metadata:
 type: Opaque
 stringData:
   admin-user: admin
-  admin-password: admin
+  # CHANGEME: replace with a strong random password before deploying
+  admin-password: CHANGE_ME_USE_STRONG_PASSWORD
 ---
 apiVersion: v1
 kind: ConfigMap

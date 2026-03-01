@@ -6,12 +6,12 @@ resource "hcloud_ssh_key" "default" {
 resource "hcloud_firewall" "default" {
   name = "dist-scheduler"
 
-  # SSH
+  # SSH — restrict to known IPs only
   rule {
     direction = "in"
     protocol  = "tcp"
     port      = "22"
-    source_ips = ["0.0.0.0/0", "::/0"]
+    source_ips = var.allowed_admin_ips
   }
 
   # HTTP (server API)
@@ -30,12 +30,12 @@ resource "hcloud_firewall" "default" {
     source_ips = ["0.0.0.0/0", "::/0"]
   }
 
-  # Kubernetes API (for remote kubectl)
+  # Kubernetes API — restrict to known IPs only
   rule {
     direction = "in"
     protocol  = "tcp"
     port      = "6443"
-    source_ips = ["0.0.0.0/0", "::/0"]
+    source_ips = var.allowed_admin_ips
   }
 }
 

@@ -21,14 +21,14 @@ func NewJobHandler(jobUsecase *usecase.JobUsecase, logger *slog.Logger) *JobHand
 }
 
 type createJobRequest struct {
-	IdempotencyKey string            `json:"idempotency_key" binding:"required"`
-	URL            string            `json:"url"             binding:"required,url"`
+	IdempotencyKey string            `json:"idempotency_key" binding:"required,max=256"`
+	URL            string            `json:"url"             binding:"required,url,max=2048"`
 	Method         string            `json:"method"          binding:"required,oneof=GET POST PUT PATCH DELETE"`
 	Headers        map[string]string `json:"headers"`
 	Body           *string           `json:"body"`
-	TimeoutSeconds int               `json:"timeout_seconds"`
+	TimeoutSeconds int               `json:"timeout_seconds" binding:"omitempty,min=1,max=3600"`
 	ScheduledAt    time.Time         `json:"scheduled_at"    binding:"required"`
-	MaxRetries     int               `json:"max_retries"`
+	MaxRetries     int               `json:"max_retries"     binding:"omitempty,min=0,max=20"`
 	Backoff        domain.Backoff    `json:"backoff"         binding:"omitempty,oneof=exponential linear"`
 }
 

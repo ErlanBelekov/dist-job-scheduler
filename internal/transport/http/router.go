@@ -8,6 +8,7 @@ import (
 
 func NewRouter(jobHandler *handler.JobHandler, authHandler *handler.AuthHandler, jwtKey []byte) *gin.Engine {
 	r := gin.Default()
+	r.Use(middleware.Security())
 
 	// Public auth routes
 	r.POST("/auth/magic-link", authHandler.RequestMagicLink)

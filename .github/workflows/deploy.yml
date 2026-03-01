@@ -49,6 +49,8 @@ jobs:
     name: Deploy to k3s
     needs: build-and-push
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
 
     steps:
       - uses: actions/checkout@v5
@@ -80,6 +82,9 @@ jobs:
           kubectl delete job migrate -n dist-scheduler --ignore-not-found
           kubectl apply -f infra/k8s/migrate-job.yaml
           kubectl wait --for=condition=Complete job/migrate -n dist-scheduler --timeout=60s
+
+      - name: Apply network policies
+        run: kubectl apply -f infra/k8s/network-policies.yaml
 
       - name: Deploy application
         run: |

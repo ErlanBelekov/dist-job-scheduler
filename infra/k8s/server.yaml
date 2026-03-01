@@ -18,6 +18,13 @@ spec:
       containers:
         - name: server
           image: europe-west3-docker.pkg.dev/notifylm/dist-scheduler/server:latest
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 65534
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
           ports:
             - containerPort: 8080
           envFrom:
