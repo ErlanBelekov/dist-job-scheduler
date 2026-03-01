@@ -19,11 +19,13 @@ data:
     datasources:
       - name: Prometheus
         type: prometheus
+        uid: prometheus
         access: proxy
         url: http://prometheus.monitoring.svc.cluster.local:9090
         isDefault: true
       - name: Loki
         type: loki
+        uid: loki
         access: proxy
         url: http://loki.monitoring.svc.cluster.local:3100
 ---
@@ -52,7 +54,7 @@ data:
   traefik.json: |
     {
       "annotations": { "list": [] },
-      "editable": false,
+      "editable": true,
       "fiscalYearStartMonth": 0,
       "graphTooltip": 1,
       "links": [],
@@ -61,7 +63,7 @@ data:
           "title": "Request Rate by Status Code",
           "type": "timeseries",
           "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
-          "datasource": { "type": "prometheus", "uid": "" },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
           "fieldConfig": {
             "defaults": {
               "custom": { "drawStyle": "line", "fillOpacity": 10, "stacking": { "mode": "normal" } },
@@ -80,7 +82,7 @@ data:
           "title": "Request Rate by Service",
           "type": "timeseries",
           "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
-          "datasource": { "type": "prometheus", "uid": "" },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
           "fieldConfig": {
             "defaults": {
               "custom": { "drawStyle": "line", "fillOpacity": 10 },
@@ -99,7 +101,7 @@ data:
           "title": "Request Duration (P50 / P95 / P99)",
           "type": "timeseries",
           "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
-          "datasource": { "type": "prometheus", "uid": "" },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
           "fieldConfig": {
             "defaults": {
               "custom": { "drawStyle": "line", "fillOpacity": 5 },
@@ -126,7 +128,7 @@ data:
           "title": "Open Connections",
           "type": "timeseries",
           "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
-          "datasource": { "type": "prometheus", "uid": "" },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
           "fieldConfig": {
             "defaults": {
               "custom": { "drawStyle": "line", "fillOpacity": 10 },
@@ -145,7 +147,7 @@ data:
           "title": "Requests by Entrypoint",
           "type": "timeseries",
           "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
-          "datasource": { "type": "prometheus", "uid": "" },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
           "fieldConfig": {
             "defaults": {
               "custom": { "drawStyle": "bars", "fillOpacity": 50, "stacking": { "mode": "normal" } },
@@ -164,7 +166,7 @@ data:
           "title": "4xx / 5xx Error Rate",
           "type": "timeseries",
           "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
-          "datasource": { "type": "prometheus", "uid": "" },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
           "fieldConfig": {
             "defaults": {
               "custom": { "drawStyle": "line", "fillOpacity": 10 },
@@ -195,97 +197,213 @@ data:
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: grafana-dashboard-logs
+  name: grafana-dashboard-postgres
   namespace: monitoring
 data:
-  app-logs.json: |
+  postgres.json: |
     {
       "annotations": { "list": [] },
-      "editable": false,
+      "editable": true,
       "fiscalYearStartMonth": 0,
       "graphTooltip": 0,
       "links": [],
       "panels": [
         {
-          "title": "Error Rate",
+          "title": "Active Connections",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "short", "thresholds": { "steps": [{ "value": 0, "color": "green" }, { "value": 80, "color": "red" }] } }, "overrides": [] },
+          "targets": [{ "expr": "pg_stat_activity_count{datname=\"scheduler\", state=\"active\"}", "legendFormat": "" }]
+        },
+        {
+          "title": "Idle Connections",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "short", "thresholds": { "steps": [{ "value": 0, "color": "green" }, { "value": 50, "color": "yellow" }] } }, "overrides": [] },
+          "targets": [{ "expr": "pg_stat_activity_count{datname=\"scheduler\", state=\"idle\"}", "legendFormat": "" }]
+        },
+        {
+          "title": "Database Size",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "bytes", "thresholds": { "steps": [{ "value": 0, "color": "green" }, { "value": 4294967296, "color": "red" }] } }, "overrides": [] },
+          "targets": [{ "expr": "pg_database_size_bytes{datname=\"scheduler\"}", "legendFormat": "" }]
+        },
+        {
+          "title": "Uptime",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 6, "x": 18, "y": 0 },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "s", "thresholds": { "steps": [{ "value": 0, "color": "green" }] } }, "overrides": [] },
+          "targets": [{ "expr": "time() - pg_postmaster_start_time_seconds", "legendFormat": "" }]
+        },
+        {
+          "title": "Transactions / sec",
           "type": "timeseries",
-          "gridPos": { "h": 6, "w": 24, "x": 0, "y": 0 },
-          "datasource": { "type": "loki", "uid": "" },
-          "fieldConfig": {
-            "defaults": {
-              "custom": { "drawStyle": "bars", "fillOpacity": 50 },
-              "color": { "mode": "fixed", "fixedColor": "red" },
-              "unit": "short"
-            },
-            "overrides": []
-          },
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "custom": { "drawStyle": "line", "fillOpacity": 10 }, "unit": "ops" }, "overrides": [] },
           "targets": [
-            {
-              "expr": "sum(count_over_time({namespace=\"dist-scheduler\", app=~\"$app\"} | json | level = `ERROR` [5m]))",
-              "legendFormat": "errors"
-            }
+            { "expr": "rate(pg_stat_database_xact_commit{datname=\"scheduler\"}[5m])", "legendFormat": "commits" },
+            { "expr": "rate(pg_stat_database_xact_rollback{datname=\"scheduler\"}[5m])", "legendFormat": "rollbacks" }
           ]
         },
         {
-          "title": "Logs",
+          "title": "Rows Read / Written",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "custom": { "drawStyle": "line", "fillOpacity": 10 }, "unit": "ops" }, "overrides": [] },
+          "targets": [
+            { "expr": "rate(pg_stat_database_tup_fetched{datname=\"scheduler\"}[5m])", "legendFormat": "fetched" },
+            { "expr": "rate(pg_stat_database_tup_inserted{datname=\"scheduler\"}[5m])", "legendFormat": "inserted" },
+            { "expr": "rate(pg_stat_database_tup_updated{datname=\"scheduler\"}[5m])", "legendFormat": "updated" },
+            { "expr": "rate(pg_stat_database_tup_deleted{datname=\"scheduler\"}[5m])", "legendFormat": "deleted" }
+          ]
+        },
+        {
+          "title": "Cache Hit Ratio",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "custom": { "drawStyle": "line", "fillOpacity": 10 }, "unit": "percentunit", "min": 0, "max": 1 }, "overrides": [] },
+          "targets": [
+            { "expr": "pg_stat_database_blks_hit{datname=\"scheduler\"} / (pg_stat_database_blks_hit{datname=\"scheduler\"} + pg_stat_database_blks_read{datname=\"scheduler\"})", "legendFormat": "hit ratio" }
+          ]
+        },
+        {
+          "title": "Connections Over Time",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "custom": { "drawStyle": "line", "fillOpacity": 10, "stacking": { "mode": "normal" } }, "unit": "short" }, "overrides": [] },
+          "targets": [
+            { "expr": "pg_stat_activity_count{datname=\"scheduler\", state=\"active\"}", "legendFormat": "active" },
+            { "expr": "pg_stat_activity_count{datname=\"scheduler\", state=\"idle\"}", "legendFormat": "idle" },
+            { "expr": "pg_stat_activity_count{datname=\"scheduler\", state=\"idle in transaction\"}", "legendFormat": "idle in txn" }
+          ]
+        },
+        {
+          "title": "PostgreSQL Logs",
           "type": "logs",
-          "gridPos": { "h": 18, "w": 24, "x": 0, "y": 6 },
-          "datasource": { "type": "loki", "uid": "" },
+          "gridPos": { "h": 10, "w": 24, "x": 0, "y": 20 },
+          "datasource": { "type": "loki", "uid": "loki" },
           "options": {
             "showTime": true,
-            "showLabels": true,
+            "showLabels": false,
             "showCommonLabels": false,
             "wrapLogMessage": true,
-            "prettifyLogMessage": true,
+            "prettifyLogMessage": false,
             "enableLogDetails": true,
             "sortOrder": "Descending",
             "dedupStrategy": "none"
           },
           "targets": [
             {
-              "expr": "{namespace=\"dist-scheduler\", app=~\"$app\"} | json | level =~ `$level`",
+              "expr": "{namespace=\"dist-scheduler\", container=\"postgres\"}",
               "legendFormat": ""
             }
           ]
         }
       ],
       "schemaVersion": 39,
-      "tags": ["logs"],
-      "templating": {
-        "list": [
-          {
-            "name": "app",
-            "type": "custom",
-            "current": { "text": "All", "value": ".+" },
-            "options": [
-              { "text": "All", "value": ".+", "selected": true },
-              { "text": "server", "value": "server", "selected": false },
-              { "text": "scheduler", "value": "scheduler", "selected": false },
-              { "text": "postgres", "value": "postgres", "selected": false }
-            ],
-            "query": "server,scheduler,postgres",
-            "includeAll": true,
-            "allValue": ".+"
-          },
-          {
-            "name": "level",
-            "type": "custom",
-            "current": { "text": "All", "value": ".+" },
-            "options": [
-              { "text": "All", "value": ".+", "selected": true },
-              { "text": "INFO", "value": "INFO", "selected": false },
-              { "text": "WARN", "value": "WARN", "selected": false },
-              { "text": "ERROR", "value": "ERROR", "selected": false }
-            ],
-            "query": "INFO,WARN,ERROR",
-            "includeAll": true,
-            "allValue": ".+"
-          }
-        ]
-      },
+      "tags": ["postgres"],
+      "templating": { "list": [] },
       "time": { "from": "now-1h", "to": "now" },
-      "title": "Application Logs",
-      "uid": "app-logs"
+      "title": "PostgreSQL",
+      "uid": "postgres"
+    }
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboard-app
+  namespace: monitoring
+data:
+  app.json: |
+    {
+      "annotations": { "list": [] },
+      "editable": true,
+      "fiscalYearStartMonth": 0,
+      "graphTooltip": 0,
+      "links": [],
+      "panels": [
+        {
+          "title": "Server Logs",
+          "type": "logs",
+          "gridPos": { "h": 10, "w": 24, "x": 0, "y": 0 },
+          "datasource": { "type": "loki", "uid": "loki" },
+          "options": {
+            "showTime": true,
+            "showLabels": true,
+            "showCommonLabels": false,
+            "wrapLogMessage": true,
+            "prettifyLogMessage": false,
+            "enableLogDetails": true,
+            "sortOrder": "Descending",
+            "dedupStrategy": "none"
+          },
+          "targets": [
+            {
+              "expr": "{namespace=\"dist-scheduler\", container=\"server\"}",
+              "legendFormat": ""
+            }
+          ]
+        },
+        {
+          "title": "Scheduler Logs",
+          "type": "logs",
+          "gridPos": { "h": 10, "w": 24, "x": 0, "y": 10 },
+          "datasource": { "type": "loki", "uid": "loki" },
+          "options": {
+            "showTime": true,
+            "showLabels": true,
+            "showCommonLabels": false,
+            "wrapLogMessage": true,
+            "prettifyLogMessage": false,
+            "enableLogDetails": true,
+            "sortOrder": "Descending",
+            "dedupStrategy": "none"
+          },
+          "targets": [
+            {
+              "expr": "{namespace=\"dist-scheduler\", container=\"scheduler\"}",
+              "legendFormat": ""
+            }
+          ]
+        },
+        {
+          "title": "Migration Logs",
+          "type": "logs",
+          "gridPos": { "h": 8, "w": 24, "x": 0, "y": 20 },
+          "datasource": { "type": "loki", "uid": "loki" },
+          "options": {
+            "showTime": true,
+            "showLabels": true,
+            "showCommonLabels": false,
+            "wrapLogMessage": true,
+            "prettifyLogMessage": false,
+            "enableLogDetails": true,
+            "sortOrder": "Descending",
+            "dedupStrategy": "none"
+          },
+          "targets": [
+            {
+              "expr": "{namespace=\"dist-scheduler\", container=\"migrate\"}",
+              "legendFormat": ""
+            }
+          ]
+        }
+      ],
+      "schemaVersion": 39,
+      "tags": ["app"],
+      "templating": { "list": [] },
+      "time": { "from": "now-1h", "to": "now" },
+      "title": "Application",
+      "uid": "app"
     }
 ---
 apiVersion: apps/v1
@@ -345,8 +463,10 @@ spec:
               mountPath: /etc/grafana/provisioning/dashboards
             - name: dashboard-traefik
               mountPath: /var/lib/grafana/dashboards/traefik
-            - name: dashboard-logs
-              mountPath: /var/lib/grafana/dashboards/logs
+            - name: dashboard-postgres
+              mountPath: /var/lib/grafana/dashboards/postgres
+            - name: dashboard-app
+              mountPath: /var/lib/grafana/dashboards/app
       volumes:
         - name: datasources
           configMap:
@@ -357,9 +477,12 @@ spec:
         - name: dashboard-traefik
           configMap:
             name: grafana-dashboard-traefik
-        - name: dashboard-logs
+        - name: dashboard-postgres
           configMap:
-            name: grafana-dashboard-logs
+            name: grafana-dashboard-postgres
+        - name: dashboard-app
+          configMap:
+            name: grafana-dashboard-app
 ---
 apiVersion: v1
 kind: Service

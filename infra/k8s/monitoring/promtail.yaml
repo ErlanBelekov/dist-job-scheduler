@@ -44,27 +44,31 @@ data:
 
     scrape_configs:
       - job_name: kubernetes-pods
-        kubernetes_sd_configs:
-          - role: pod
-        relabel_configs:
-          - source_labels: [__meta_kubernetes_pod_label_app]
-            target_label: app
-          - source_labels: [__meta_kubernetes_namespace]
-            target_label: namespace
-          - source_labels: [__meta_kubernetes_pod_name]
-            target_label: pod
-          - source_labels: [__meta_kubernetes_pod_container_name]
-            target_label: container
+        static_configs:
+          - targets: [localhost]
+            labels:
+              job: varlogs
+              __path__: /var/log/pods/*/*/*.log
         pipeline_stages:
           - cri: {}
-          - json:
-              expressions:
-                level: level
-                msg: msg
-                component: component
+          - regex:
+              source: filename
+              expression: /var/log/pods/(?P<namespace>.+?)_(?P<pod>.+?)_[^/]+/(?P<container>.+?)/.*
           - labels:
-              level:
-              component:
+              namespace:
+              pod:
+              container:
+          - match:
+              selector: '{namespace="dist-scheduler"} |~ "^\\{"'
+              stages:
+                - json:
+                    expressions:
+                      level: level
+                      msg: msg
+                      component: component
+                - labels:
+                    level:
+                    component:
 ---
 apiVersion: apps/v1
 kind: DaemonSet

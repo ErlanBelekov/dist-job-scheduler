@@ -70,6 +70,41 @@ spec:
               command: ["pg_isready", "-U", "scheduler"]
             initialDelaySeconds: 15
             periodSeconds: 10
+        - name: postgres-exporter
+          image: quay.io/prometheuscommunity/postgres-exporter:v0.16.0
+          ports:
+            - containerPort: 9187
+          env:
+            - name: PG_USER
+              valueFrom:
+                secretKeyRef:
+                  name: dist-scheduler
+                  key: POSTGRES_USER
+            - name: PG_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: dist-scheduler
+                  key: POSTGRES_PASSWORD
+            - name: PG_DB
+              valueFrom:
+                secretKeyRef:
+                  name: dist-scheduler
+                  key: POSTGRES_DB
+            - name: DATA_SOURCE_NAME
+              value: "postgresql://$(PG_USER):$(PG_PASS)@localhost:5432/$(PG_DB)?sslmode=disable"
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              cpu: 50m
+              memory: 32Mi
+          readinessProbe:
+            httpGet:
+              path: /metrics
+              port: 9187
+            initialDelaySeconds: 5
+            periodSeconds: 10
   volumeClaimTemplates:
     - metadata:
         name: postgres-data

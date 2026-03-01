@@ -54,6 +54,10 @@ data:
             target_label: __address__
             replacement: ${1}:9100
 
+      - job_name: "postgres"
+        static_configs:
+          - targets: ["postgres.dist-scheduler.svc.cluster.local:9187"]
+
       - job_name: "prometheus"
         static_configs:
           - targets: ["localhost:9090"]
@@ -77,6 +81,8 @@ metadata:
   namespace: monitoring
 spec:
   replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: prometheus
