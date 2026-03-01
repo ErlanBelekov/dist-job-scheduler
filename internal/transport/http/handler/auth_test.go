@@ -130,7 +130,7 @@ func TestVerify_InvalidToken_Returns401(t *testing.T) {
 	}
 }
 
-func TestVerify_InternalError_Returns500(t *testing.T) {
+func TestVerify_InternalError_Returns401(t *testing.T) {
 	uc := &fakeAuthUsecase{
 		verifyMagicLink: func(_ context.Context, _ string) (string, error) {
 			return "", errors.New("db down")
@@ -140,8 +140,8 @@ func TestVerify_InternalError_Returns500(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/auth/verify?token=sometoken", nil)
 	newTestEngine(uc).ServeHTTP(w, req)
 
-	if w.Code != http.StatusInternalServerError {
-		t.Errorf("status = %d, want 500", w.Code)
+	if w.Code != http.StatusUnauthorized {
+		t.Errorf("status = %d, want 401", w.Code)
 	}
 }
 

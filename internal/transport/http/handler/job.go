@@ -67,11 +67,11 @@ func (h *JobHandler) Create(ctx *gin.Context) {
 	})
 	if err != nil {
 		if errors.Is(err, domain.ErrDuplicateJob) {
-			ctx.JSON(http.StatusBadRequest, gin.H{"error": domain.ErrDuplicateJob.Error()})
+			ctx.JSON(http.StatusBadRequest, gin.H{"error": errDuplicateJob})
 			return
 		}
 		h.logger.Error("create job", "error", err)
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": errInternalServer})
 		return
 	}
 
@@ -87,11 +87,11 @@ func (h *JobHandler) GetByID(ctx *gin.Context) {
 	job, err := h.jobUsecase.GetByID(ctx.Request.Context(), jobID)
 	if err != nil {
 		if errors.Is(err, domain.ErrJobNotFound) {
-			ctx.JSON(http.StatusNotFound, gin.H{"error": "job not found"})
+			ctx.JSON(http.StatusNotFound, gin.H{"error": errJobNotFound})
 			return
 		}
 		h.logger.Error("get job by id", "job_id", jobID, "error", err)
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": errInternalServer})
 		return
 	}
 
