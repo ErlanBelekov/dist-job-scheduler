@@ -329,13 +329,130 @@ data:
       "annotations": { "list": [] },
       "editable": true,
       "fiscalYearStartMonth": 0,
-      "graphTooltip": 0,
+      "graphTooltip": 1,
       "links": [],
       "panels": [
         {
+          "title": "Jobs In Flight",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "short", "thresholds": { "steps": [{ "value": 0, "color": "green" }, { "value": 4, "color": "yellow" }, { "value": 8, "color": "red" }] } }, "overrides": [] },
+          "targets": [{ "expr": "scheduler_worker_jobs_in_flight", "legendFormat": "" }]
+        },
+        {
+          "title": "Worker Uptime",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "s", "thresholds": { "steps": [{ "value": 0, "color": "green" }] } }, "overrides": [] },
+          "targets": [{ "expr": "time() - scheduler_worker_start_time_seconds", "legendFormat": "" }]
+        },
+        {
+          "title": "Worker Shutdowns",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "short", "thresholds": { "steps": [{ "value": 0, "color": "green" }, { "value": 5, "color": "yellow" }] } }, "overrides": [] },
+          "targets": [{ "expr": "scheduler_worker_shutdowns_total", "legendFormat": "" }]
+        },
+        {
+          "title": "API Error Rate",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 6, "x": 18, "y": 0 },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "percentunit", "thresholds": { "steps": [{ "value": 0, "color": "green" }, { "value": 0.01, "color": "yellow" }, { "value": 0.05, "color": "red" }] }, "min": 0, "max": 1, "noValue": "0%" }, "overrides": [] },
+          "targets": [{ "expr": "sum(rate(scheduler_http_requests_total{status=~\"5..\"}[5m])) / sum(rate(scheduler_http_requests_total[5m]))", "legendFormat": "" }]
+        },
+        {
+          "title": "Job Pickup Latency (P50 / P95 / P99)",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "custom": { "drawStyle": "line", "fillOpacity": 5 }, "unit": "s" }, "overrides": [] },
+          "targets": [
+            { "expr": "histogram_quantile(0.50, sum(rate(scheduler_job_pickup_latency_seconds_bucket[5m])) by (le))", "legendFormat": "P50" },
+            { "expr": "histogram_quantile(0.95, sum(rate(scheduler_job_pickup_latency_seconds_bucket[5m])) by (le))", "legendFormat": "P95" },
+            { "expr": "histogram_quantile(0.99, sum(rate(scheduler_job_pickup_latency_seconds_bucket[5m])) by (le))", "legendFormat": "P99" }
+          ]
+        },
+        {
+          "title": "Job Execution Duration",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "custom": { "drawStyle": "line", "fillOpacity": 5 }, "unit": "s" }, "overrides": [] },
+          "targets": [
+            { "expr": "histogram_quantile(0.50, sum(rate(scheduler_job_execution_duration_seconds_bucket[5m])) by (le, status))", "legendFormat": "P50 {{status}}" },
+            { "expr": "histogram_quantile(0.99, sum(rate(scheduler_job_execution_duration_seconds_bucket[5m])) by (le, status))", "legendFormat": "P99 {{status}}" }
+          ]
+        },
+        {
+          "title": "HTTP Request Rate",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "custom": { "drawStyle": "line", "fillOpacity": 10, "stacking": { "mode": "normal" } }, "unit": "reqps" }, "overrides": [] },
+          "targets": [
+            { "expr": "sum(rate(scheduler_http_requests_total[5m])) by (status)", "legendFormat": "{{status}}" }
+          ]
+        },
+        {
+          "title": "HTTP Latency (P50 / P95 / P99)",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "custom": { "drawStyle": "line", "fillOpacity": 5 }, "unit": "s" }, "overrides": [] },
+          "targets": [
+            { "expr": "histogram_quantile(0.50, sum(rate(scheduler_http_request_duration_seconds_bucket[5m])) by (le))", "legendFormat": "P50" },
+            { "expr": "histogram_quantile(0.95, sum(rate(scheduler_http_request_duration_seconds_bucket[5m])) by (le))", "legendFormat": "P95" },
+            { "expr": "histogram_quantile(0.99, sum(rate(scheduler_http_request_duration_seconds_bucket[5m])) by (le))", "legendFormat": "P99" }
+          ]
+        },
+        {
+          "title": "Jobs Completed by Outcome",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 20 },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "custom": { "drawStyle": "line", "fillOpacity": 10, "stacking": { "mode": "normal" } }, "unit": "ops" }, "overrides": [] },
+          "targets": [
+            { "expr": "sum(rate(scheduler_jobs_completed_total[5m])) by (outcome)", "legendFormat": "{{outcome}}" }
+          ]
+        },
+        {
+          "title": "Reaper Rescued Jobs",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 20 },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "custom": { "drawStyle": "line", "fillOpacity": 10 }, "unit": "ops" }, "overrides": [] },
+          "targets": [
+            { "expr": "sum(rate(scheduler_reaper_rescued_total[5m])) by (action)", "legendFormat": "{{action}}" }
+          ]
+        },
+        {
+          "title": "Reaper Cycle Duration",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 28 },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "custom": { "drawStyle": "line", "fillOpacity": 5 }, "unit": "s" }, "overrides": [] },
+          "targets": [
+            { "expr": "histogram_quantile(0.50, sum(rate(scheduler_reaper_cycle_duration_seconds_bucket[5m])) by (le))", "legendFormat": "P50" },
+            { "expr": "histogram_quantile(0.99, sum(rate(scheduler_reaper_cycle_duration_seconds_bucket[5m])) by (le))", "legendFormat": "P99" }
+          ]
+        },
+        {
+          "title": "Reaper Rescue Rate",
+          "type": "stat",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 28 },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "fieldConfig": { "defaults": { "unit": "percentunit", "thresholds": { "steps": [{ "value": 0, "color": "green" }, { "value": 0.01, "color": "red" }] }, "min": 0, "max": 1, "noValue": "0%" }, "overrides": [] },
+          "options": { "graphMode": "area", "textMode": "auto" },
+          "targets": [{ "expr": "sum(rate(scheduler_reaper_rescued_total{action=\"rescheduled\"}[5m])) / sum(rate(scheduler_jobs_completed_total[5m]))", "legendFormat": "rescue rate" }]
+        },
+        {
           "title": "Server Logs",
           "type": "logs",
-          "gridPos": { "h": 10, "w": 24, "x": 0, "y": 0 },
+          "gridPos": { "h": 10, "w": 24, "x": 0, "y": 36 },
           "datasource": { "type": "loki", "uid": "loki" },
           "options": {
             "showTime": true,
@@ -357,7 +474,7 @@ data:
         {
           "title": "Scheduler Logs",
           "type": "logs",
-          "gridPos": { "h": 10, "w": 24, "x": 0, "y": 10 },
+          "gridPos": { "h": 10, "w": 24, "x": 0, "y": 46 },
           "datasource": { "type": "loki", "uid": "loki" },
           "options": {
             "showTime": true,
@@ -379,7 +496,7 @@ data:
         {
           "title": "Migration Logs",
           "type": "logs",
-          "gridPos": { "h": 8, "w": 24, "x": 0, "y": 20 },
+          "gridPos": { "h": 8, "w": 24, "x": 0, "y": 56 },
           "datasource": { "type": "loki", "uid": "loki" },
           "options": {
             "showTime": true,

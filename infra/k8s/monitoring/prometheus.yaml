@@ -58,6 +58,34 @@ data:
         static_configs:
           - targets: ["postgres.dist-scheduler.svc.cluster.local:9187"]
 
+      - job_name: "dist-scheduler-server"
+        kubernetes_sd_configs:
+          - role: pod
+            namespaces:
+              names: ["dist-scheduler"]
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_pod_label_app]
+            regex: server
+            action: keep
+          - source_labels: [__address__]
+            regex: (.+):(\d+)
+            target_label: __address__
+            replacement: ${1}:9090
+
+      - job_name: "dist-scheduler-scheduler"
+        kubernetes_sd_configs:
+          - role: pod
+            namespaces:
+              names: ["dist-scheduler"]
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_pod_label_app]
+            regex: scheduler
+            action: keep
+          - source_labels: [__address__]
+            regex: (.+):(\d+)
+            target_label: __address__
+            replacement: ${1}:9090
+
       - job_name: "prometheus"
         static_configs:
           - targets: ["localhost:9090"]

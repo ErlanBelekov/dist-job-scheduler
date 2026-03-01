@@ -14,6 +14,10 @@ spec:
     metadata:
       labels:
         app: scheduler
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9090"
+        prometheus.io/path: "/metrics"
     spec:
       imagePullSecrets:
         - name: gcr-pull
@@ -27,6 +31,9 @@ spec:
             readOnlyRootFilesystem: true
             capabilities:
               drop: ["ALL"]
+          ports:
+            - containerPort: 9090
+              name: metrics
           envFrom:
             - configMapRef:
                 name: dist-scheduler
@@ -39,3 +46,17 @@ spec:
             limits:
               cpu: 300m
               memory: 256Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: scheduler
+  namespace: dist-scheduler
+spec:
+  type: ClusterIP
+  selector:
+    app: scheduler
+  ports:
+    - port: 9090
+      targetPort: 9090
+      name: metrics

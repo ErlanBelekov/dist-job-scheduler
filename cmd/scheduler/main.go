@@ -2,8 +2,10 @@ package main
 
 import (
 	"context"
+	"errors"
 	"log"
 	"log/slog"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
@@ -11,6 +13,7 @@ import (
 
 	"github.com/ErlanBelekov/dist-job-scheduler/config"
 	"github.com/ErlanBelekov/dist-job-scheduler/internal/infrastructure/postgres"
+	"github.com/ErlanBelekov/dist-job-scheduler/internal/metrics"
 	"github.com/ErlanBelekov/dist-job-scheduler/internal/scheduler"
 )
 
@@ -33,6 +36,8 @@ func main() {
 
 	logger.Info("db connected")
 
+	metrics.Register()
+
 	jobRepo := postgres.NewJobRepository(pool)
 	attemptRepo := postgres.NewAttemptRepository(pool)
 
@@ -49,8 +54,23 @@ func main() {
 	reaper := scheduler.NewReaper(jobRepo, logger, 30*time.Second, 30*time.Second)
 	go reaper.Start(ctx)
 
+	metricsSrv := metrics.NewServer(":" + cfg.MetricsPort)
+	go func() {
+		logger.Info("metrics server started", "port", cfg.MetricsPort)
+		if err := metricsSrv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			logger.Error("metrics server", "error", err)
+		}
+	}()
+
 	<-ctx.Done()
 	stop()
+
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if err := metricsSrv.Shutdown(shutdownCtx); err != nil {
+		logger.Error("metrics server shutdown", "error", err)
+	}
+
 	logger.Info("scheduler shut down")
 }
 

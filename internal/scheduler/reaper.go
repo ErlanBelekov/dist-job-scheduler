@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/ErlanBelekov/dist-job-scheduler/internal/metrics"
 	"github.com/ErlanBelekov/dist-job-scheduler/internal/repository"
 )
 
@@ -42,12 +43,18 @@ func (r *Reaper) Start(ctx context.Context) {
 }
 
 func (r *Reaper) reap(ctx context.Context) {
+	start := time.Now()
+	defer func() {
+		metrics.ReaperCycleDuration.Observe(time.Since(start).Seconds())
+	}()
+
 	staleCutoff := time.Now().Add(-r.heartbeatTimeout)
 
 	rescheduled, err := r.repo.RescheduleStale(ctx, staleCutoff, 100)
 	if err != nil {
 		r.logger.Error("reschedule stale jobs", "error", err)
 	} else if rescheduled > 0 {
+		metrics.ReaperRescuedTotal.WithLabelValues("rescheduled").Add(float64(rescheduled))
 		r.logger.Info("rescheduled stale jobs", "count", rescheduled)
 	}
 
@@ -55,6 +62,7 @@ func (r *Reaper) reap(ctx context.Context) {
 	if err != nil {
 		r.logger.Error("fail stale jobs", "error", err)
 	} else if failed > 0 {
+		metrics.ReaperRescuedTotal.WithLabelValues("failed").Add(float64(failed))
 		r.logger.Info("permanently failed stale jobs", "count", failed)
 	}
 }

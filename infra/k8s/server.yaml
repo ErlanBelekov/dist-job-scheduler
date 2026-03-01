@@ -12,6 +12,10 @@ spec:
     metadata:
       labels:
         app: server
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9090"
+        prometheus.io/path: "/metrics"
     spec:
       imagePullSecrets:
         - name: gcr-pull
@@ -27,6 +31,8 @@ spec:
               drop: ["ALL"]
           ports:
             - containerPort: 8080
+            - containerPort: 9090
+              name: metrics
           envFrom:
             - configMapRef:
                 name: dist-scheduler

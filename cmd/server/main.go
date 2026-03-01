@@ -14,6 +14,7 @@ import (
 	"github.com/ErlanBelekov/dist-job-scheduler/config"
 	"github.com/ErlanBelekov/dist-job-scheduler/internal/email"
 	"github.com/ErlanBelekov/dist-job-scheduler/internal/infrastructure/postgres"
+	"github.com/ErlanBelekov/dist-job-scheduler/internal/metrics"
 	httptransport "github.com/ErlanBelekov/dist-job-scheduler/internal/transport/http"
 	"github.com/ErlanBelekov/dist-job-scheduler/internal/transport/http/handler"
 	"github.com/ErlanBelekov/dist-job-scheduler/internal/usecase"
@@ -48,15 +49,26 @@ func main() {
 	authUsecase := usecase.NewAuthUsecase(userRepo, emailSender, []byte(cfg.JWTSecret), cfg.MagicLinkBase)
 	authHandler := handler.NewAuthHandler(authUsecase, logger)
 
+	metrics.Register()
+
 	srv := http.Server{
 		Addr:    ":" + cfg.Port,
 		Handler: httptransport.NewRouter(jobHandler, authHandler, []byte(cfg.JWTSecret)),
 	}
 
+	metricsSrv := metrics.NewServer(":" + cfg.MetricsPort)
+
 	go func() {
 		logger.Info("server started", "port", cfg.Port)
 		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			log.Fatalf("server: %v", err)
+		}
+	}()
+
+	go func() {
+		logger.Info("metrics server started", "port", cfg.MetricsPort)
+		if err := metricsSrv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			logger.Error("metrics server", "error", err)
 		}
 	}()
 
@@ -68,6 +80,9 @@ func main() {
 	defer cancel()
 	if err := srv.Shutdown(shutdownCtx); err != nil {
 		logger.Error("server shutdown", "error", err)
+	}
+	if err := metricsSrv.Shutdown(shutdownCtx); err != nil {
+		logger.Error("metrics server shutdown", "error", err)
 	}
 }
 
