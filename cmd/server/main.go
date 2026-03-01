@@ -38,7 +38,8 @@ func main() {
 
 	// Jobs
 	jobRepo := postgres.NewJobRepository(pool)
-	jobUsecase := usecase.NewJobUsecase(jobRepo)
+	attemptRepo := postgres.NewAttemptRepository(pool)
+	jobUsecase := usecase.NewJobUsecase(jobRepo, attemptRepo)
 	jobHandler := handler.NewJobHandler(jobUsecase, logger)
 
 	// Auth

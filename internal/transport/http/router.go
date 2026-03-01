@@ -18,6 +18,7 @@ func NewRouter(jobHandler *handler.JobHandler, authHandler *handler.AuthHandler,
 	jobs := r.Group("/jobs", middleware.Auth(jwtKey))
 	jobs.POST("", jobHandler.Create)
 	jobs.GET("/:id", jobHandler.GetByID)
+	jobs.GET("/:id/attempts", jobHandler.ListAttempts)
 
 	return r
 }

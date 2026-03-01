@@ -34,9 +34,11 @@ func main() {
 	logger.Info("db connected")
 
 	jobRepo := postgres.NewJobRepository(pool)
+	attemptRepo := postgres.NewAttemptRepository(pool)
 
 	worker := scheduler.NewWorker(
 		jobRepo,
+		attemptRepo,
 		logger,
 		time.Duration(cfg.PollIntervalSec)*time.Second,
 		cfg.WorkerCount,

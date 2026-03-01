@@ -17,6 +17,7 @@ import (
 type Worker struct {
 	id           string
 	repo         repository.JobRepository
+	attempts     repository.AttemptRepository
 	executor     *Executor
 	logger       *slog.Logger
 	pollInterval time.Duration
@@ -24,12 +25,19 @@ type Worker struct {
 	sem          chan struct{}
 }
 
-func NewWorker(repo repository.JobRepository, logger *slog.Logger, pollInterval time.Duration, concurrency int) *Worker {
+func NewWorker(
+	repo repository.JobRepository,
+	attempts repository.AttemptRepository,
+	logger *slog.Logger,
+	pollInterval time.Duration,
+	concurrency int,
+) *Worker {
 	hostname, _ := os.Hostname()
 	id := fmt.Sprintf("%s-%d", hostname, os.Getpid())
 	return &Worker{
 		id:           id,
 		repo:         repo,
+		attempts:     attempts,
 		executor:     NewExecutor(),
 		logger:       logger.With("worker_id", id),
 		pollInterval: pollInterval,
@@ -83,6 +91,21 @@ func (w *Worker) processBatch(ctx context.Context) {
 }
 
 func (w *Worker) runJob(ctx context.Context, job *domain.Job) {
+	startedAt := time.Now()
+
+	// Open the attempt record before executing so a worker crash leaves a
+	// visible incomplete entry (completed_at = NULL) in the history.
+	attempt, err := w.attempts.CreateAttempt(ctx, &domain.JobAttempt{
+		JobID:      job.ID,
+		AttemptNum: job.RetryCount + 1,
+		WorkerID:   w.id,
+		StartedAt:  startedAt,
+	})
+	if err != nil {
+		w.logger.Error("create attempt record", "job_id", job.ID, "error", err)
+		// non-fatal: still execute the job, just won't have history for this run
+	}
+
 	heartbeatCtx, cancelHeartbeat := context.WithCancel(ctx)
 	defer cancelHeartbeat()
 	go w.heartbeat(heartbeatCtx, job.ID)
@@ -90,8 +113,10 @@ func (w *Worker) runJob(ctx context.Context, job *domain.Job) {
 	w.logger.Info("executing job", "job_id", job.ID, "method", job.Method, "url", job.URL)
 
 	result := w.executor.Run(ctx, job)
+	durationMS := time.Since(startedAt).Milliseconds()
 
 	if result.Err == nil && result.StatusCode == http.StatusOK {
+		w.closeAttempt(ctx, attempt, &result.StatusCode, nil, durationMS)
 		if err := w.repo.Complete(ctx, job.ID); err != nil {
 			w.logger.Error("mark job complete", "job_id", job.ID, "error", err)
 		}
@@ -105,6 +130,12 @@ func (w *Worker) runJob(ctx context.Context, job *domain.Job) {
 	} else {
 		errMsg = fmt.Sprintf("unexpected status code: %d", result.StatusCode)
 	}
+
+	var statusCode *int
+	if result.StatusCode != 0 {
+		statusCode = &result.StatusCode
+	}
+	w.closeAttempt(ctx, attempt, statusCode, &errMsg, durationMS)
 
 	if job.RetryCount < job.MaxRetries {
 		retryAt := time.Now().Add(retryDelay(job.Backoff, job.RetryCount))
@@ -123,6 +154,17 @@ func (w *Worker) runJob(ctx context.Context, job *domain.Job) {
 			w.logger.Error("mark job failed", "job_id", job.ID, "error", err)
 		}
 		w.logger.Warn("job permanently failed", "job_id", job.ID, "error", errMsg)
+	}
+}
+
+// closeAttempt writes the execution outcome to the attempt record.
+// It is a no-op when attempt is nil (i.e. CreateAttempt failed earlier).
+func (w *Worker) closeAttempt(ctx context.Context, attempt *domain.JobAttempt, statusCode *int, errMsg *string, durationMS int64) {
+	if attempt == nil {
+		return
+	}
+	if err := w.attempts.CompleteAttempt(ctx, attempt.ID, statusCode, errMsg, durationMS); err != nil {
+		w.logger.Error("complete attempt record", "job_id", attempt.JobID, "error", err)
 	}
 }
 

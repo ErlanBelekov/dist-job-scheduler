@@ -10,11 +10,12 @@ import (
 )
 
 type JobUsecase struct {
-	repo repository.JobRepository
+	repo     repository.JobRepository
+	attempts repository.AttemptRepository
 }
 
-func NewJobUsecase(repo repository.JobRepository) *JobUsecase {
-	return &JobUsecase{repo: repo}
+func NewJobUsecase(repo repository.JobRepository, attempts repository.AttemptRepository) *JobUsecase {
+	return &JobUsecase{repo: repo, attempts: attempts}
 }
 
 type CreateJobInput struct {
@@ -73,4 +74,16 @@ func (u *JobUsecase) GetByID(ctx context.Context, jobID, userID string) (*domain
 		return nil, fmt.Errorf("get job: %w", err)
 	}
 	return job, nil
+}
+
+func (u *JobUsecase) ListAttempts(ctx context.Context, jobID, userID string) ([]*domain.JobAttempt, error) {
+	// Verify the job exists and belongs to this user before returning its attempts.
+	if _, err := u.repo.GetByID(ctx, jobID, userID); err != nil {
+		return nil, fmt.Errorf("get job: %w", err)
+	}
+	attempts, err := u.attempts.ListByJobID(ctx, jobID)
+	if err != nil {
+		return nil, fmt.Errorf("list attempts: %w", err)
+	}
+	return attempts, nil
 }
