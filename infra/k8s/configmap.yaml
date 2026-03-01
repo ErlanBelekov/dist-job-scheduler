@@ -8,4 +8,4 @@ data:
   PORT: "8080"
   WORKER_COUNT: "5"
   POLL_INTERVAL_SEC: "1"
-  MAGIC_LINK_BASE_URL: "https://jobs.enkiduck.com"
+  MAGIC_LINK_BASE_URL: "https://job.enkiduck.com"

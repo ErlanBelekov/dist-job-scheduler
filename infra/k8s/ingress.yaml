@@ -8,10 +8,10 @@ metadata:
 spec:
   tls:
     - hosts:
-        - jobs.enkiduck.com
+        - job.enkiduck.com
       secretName: server-tls
   rules:
-    - host: jobs.enkiduck.com
+    - host: job.enkiduck.com
       http:
         paths:
           - path: /
