@@ -1,0 +1,1011 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1920, height=1080">
+<title>Fliq — Pitch Video</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+  --bg: #06080f;
+  --blue: #3b82f6;
+  --blue-bright: #60a5fa;
+  --purple: #a855f7;
+  --purple-deep: #7c3aed;
+  --cyan: #22d3ee;
+  --green: #34d399;
+  --red: #f87171;
+  --orange: #fb923c;
+  --yellow: #fbbf24;
+  --white: #f1f5f9;
+  --gray: #64748b;
+  --gray-dim: #334155;
+}
+
+html, body {
+  width: 1920px;
+  height: 1080px;
+  overflow: hidden;
+  background: var(--bg);
+  font-family: 'Outfit', sans-serif;
+  color: var(--white);
+}
+
+#canvas {
+  position: relative;
+  width: 1920px;
+  height: 1080px;
+  overflow: hidden;
+  background: var(--bg);
+}
+
+/* ── Background ── */
+#dotgrid {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  opacity: 0.1;
+}
+
+.ambient {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(160px);
+  opacity: 0;
+  z-index: 0;
+  transition: opacity 1.5s ease;
+}
+.ambient.on { opacity: 1; }
+.ambient-1 { width: 900px; height: 900px; top: -300px; left: -200px; background: radial-gradient(circle, rgba(59,130,246,0.18), transparent 70%); }
+.ambient-2 { width: 700px; height: 700px; bottom: -200px; right: -100px; background: radial-gradient(circle, rgba(168,85,247,0.15), transparent 70%); }
+.ambient-3 { width: 500px; height: 500px; top: 50%; left: 50%; transform: translate(-50%,-50%); background: radial-gradient(circle, rgba(34,211,238,0.08), transparent 70%); }
+
+#progress-bar {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  height: 4px;
+  width: 0%;
+  background: linear-gradient(90deg, var(--blue), var(--purple), var(--cyan));
+  z-index: 100;
+}
+
+.particle {
+  position: absolute;
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: var(--blue);
+  opacity: 0;
+  z-index: 0;
+}
+
+.scanline {
+  position: absolute;
+  top: -2px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, rgba(59,130,246,0.3), transparent);
+  z-index: 99;
+  opacity: 0;
+  animation: scanmove 5s linear infinite;
+}
+.scanline.on { opacity: 1; }
+@keyframes scanmove { 0% { top: -2px; } 100% { top: 1080px; } }
+
+/* ── Scene base ── */
+.scene {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 1;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.7s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.scene.active { opacity: 1; pointer-events: auto; }
+
+/* ── Shared animation classes ── */
+.fade-up {
+  opacity: 0;
+  transform: translateY(35px);
+}
+.fade-up.in {
+  opacity: 1;
+  transform: translateY(0);
+  transition: all 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.fade-left {
+  opacity: 0;
+  transform: translateX(-40px);
+}
+.fade-left.in {
+  opacity: 1;
+  transform: translateX(0);
+  transition: all 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.fade-right {
+  opacity: 0;
+  transform: translateX(40px);
+}
+.fade-right.in {
+  opacity: 1;
+  transform: translateX(0);
+  transition: all 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.fade-in {
+  opacity: 0;
+}
+.fade-in.in {
+  opacity: 1;
+  transition: opacity 0.8s ease;
+}
+.scale-in {
+  opacity: 0;
+  transform: scale(0.7);
+  filter: blur(12px);
+}
+.scale-in.in {
+  opacity: 1;
+  transform: scale(1);
+  filter: blur(0);
+  transition: all 0.9s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.gradient-text {
+  background: linear-gradient(135deg, var(--blue-bright), var(--purple));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.gradient-text-2 {
+  background: linear-gradient(135deg, var(--blue-bright), var(--cyan));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.gradient-text-3 {
+  background: linear-gradient(135deg, var(--cyan), var(--green));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ══════════════════════════════════════
+   SCENE 1: HOOK + PROBLEM (0–8s)
+   ══════════════════════════════════════ */
+#scene1 { gap: 40px; }
+.s1-hook {
+  font-size: 68px;
+  font-weight: 800;
+  text-align: center;
+  line-height: 1.15;
+  letter-spacing: -2px;
+}
+.s1-sub {
+  font-size: 36px;
+  font-weight: 400;
+  color: var(--gray);
+  text-align: center;
+  max-width: 950px;
+  line-height: 1.5;
+}
+.s1-sub .strike {
+  text-decoration: line-through;
+  text-decoration-color: var(--red);
+  text-decoration-thickness: 3px;
+  color: var(--red);
+  opacity: 0.8;
+}
+.s1-stat {
+  display: flex;
+  gap: 60px;
+  margin-top: 20px;
+}
+.s1-stat-item {
+  text-align: center;
+}
+.s1-stat-num {
+  font-size: 48px;
+  font-weight: 800;
+  font-family: 'JetBrains Mono', monospace;
+}
+.s1-stat-label {
+  font-size: 18px;
+  color: var(--gray);
+  margin-top: 4px;
+}
+
+/* ══════════════════════════════════════
+   SCENE 2: SOLUTION + LOGO (8–18s)
+   ══════════════════════════════════════ */
+#scene2 { gap: 30px; }
+.s2-logo {
+  font-size: 160px;
+  font-weight: 900;
+  letter-spacing: -5px;
+  background: linear-gradient(135deg, var(--blue-bright), var(--purple), var(--cyan));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.s2-tagline {
+  font-size: 38px;
+  font-weight: 300;
+  color: var(--gray);
+  letter-spacing: 3px;
+  text-transform: uppercase;
+}
+.s2-desc {
+  font-size: 32px;
+  font-weight: 500;
+  text-align: center;
+  max-width: 900px;
+  line-height: 1.5;
+  margin-top: 10px;
+}
+.s2-desc em {
+  font-style: normal;
+  font-weight: 700;
+  color: var(--cyan);
+}
+
+/* Logo pulse ring */
+.logo-ring {
+  position: absolute;
+  width: 200px;
+  height: 200px;
+  border-radius: 50%;
+  border: 2px solid var(--purple);
+  top: 38%;
+  left: 50%;
+  transform: translate(-50%, -50%) scale(0);
+  opacity: 0;
+  pointer-events: none;
+}
+.logo-ring.flash {
+  opacity: 0.6;
+  transform: translate(-50%, -50%) scale(0.6);
+}
+.logo-ring.expand {
+  transform: translate(-50%, -50%) scale(4);
+  opacity: 0;
+  transition: all 1.5s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* ══════════════════════════════════════
+   SCENE 3: HOW IT WORKS (18–30s)
+   ══════════════════════════════════════ */
+#scene3 {
+  flex-direction: row;
+  gap: 80px;
+  padding: 0 120px;
+}
+
+.code-panel { flex: 1; max-width: 780px; }
+.code-label {
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: var(--gray);
+  margin-bottom: 14px;
+}
+.code-block {
+  background: #0d1117;
+  border: 1px solid rgba(59,130,246,0.2);
+  border-radius: 14px;
+  padding: 36px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 21px;
+  line-height: 1.7;
+  position: relative;
+  overflow: hidden;
+}
+.code-block::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--blue), var(--purple));
+}
+.code-method { color: var(--green); font-weight: 600; }
+.code-url { color: var(--blue-bright); }
+.code-key { color: var(--purple); }
+.code-string { color: var(--orange); }
+.code-num { color: var(--cyan); }
+.code-line { opacity: 0; transform: translateX(-10px); }
+.code-line.typed { opacity: 1; transform: translateX(0); transition: all 0.3s ease; }
+
+.timeline-panel {
+  flex: 1;
+  max-width: 560px;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+.timeline-track {
+  position: absolute;
+  left: 27px;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: var(--gray-dim);
+}
+.timeline-fill {
+  width: 100%;
+  height: 0%;
+  background: linear-gradient(180deg, var(--blue), var(--green));
+  transition: height 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.tl-step {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  padding: 18px 0;
+  opacity: 0;
+  transform: translateX(25px);
+}
+.tl-step.in {
+  opacity: 1;
+  transform: translateX(0);
+  transition: all 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.tl-dot {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  flex-shrink: 0;
+  z-index: 2;
+}
+.tl-dot.d1 { background: rgba(59,130,246,0.2); border: 2px solid var(--blue); }
+.tl-dot.d2 { background: rgba(168,85,247,0.2); border: 2px solid var(--purple); }
+.tl-dot.d3 { background: rgba(248,113,113,0.2); border: 2px solid var(--red); }
+.tl-dot.d4 { background: rgba(52,211,153,0.2); border: 2px solid var(--green); }
+.tl-label { font-size: 26px; font-weight: 600; }
+.tl-sublabel { font-size: 16px; color: var(--gray); margin-top: 3px; }
+
+.s3-bottom {
+  position: absolute;
+  bottom: 70px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 44px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+/* ══════════════════════════════════════
+   SCENE 4: MARKET (30–40s)
+   ══════════════════════════════════════ */
+#scene4 { gap: 50px; }
+.s4-title {
+  font-size: 52px;
+  font-weight: 800;
+  text-align: center;
+  letter-spacing: -1px;
+}
+.market-cards {
+  display: flex;
+  gap: 40px;
+}
+.market-card {
+  width: 380px;
+  padding: 36px;
+  border-radius: 16px;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.06);
+  text-align: center;
+}
+.mc-number {
+  font-size: 56px;
+  font-weight: 900;
+  font-family: 'JetBrains Mono', monospace;
+  line-height: 1;
+}
+.mc-label {
+  font-size: 20px;
+  color: var(--gray);
+  margin-top: 12px;
+  line-height: 1.4;
+}
+.mc-source {
+  font-size: 13px;
+  color: var(--gray-dim);
+  margin-top: 10px;
+}
+
+.market-bottom {
+  display: flex;
+  gap: 80px;
+  margin-top: 10px;
+}
+.mb-item { text-align: center; }
+.mb-num {
+  font-size: 40px;
+  font-weight: 800;
+  font-family: 'JetBrains Mono', monospace;
+}
+.mb-label {
+  font-size: 17px;
+  color: var(--gray);
+  margin-top: 6px;
+}
+
+.s4-comp {
+  font-size: 26px;
+  color: var(--gray);
+  margin-top: 5px;
+}
+.s4-comp strong {
+  color: var(--white);
+  font-weight: 700;
+}
+
+/* ══════════════════════════════════════
+   SCENE 5: BUSINESS MODEL (40–48s)
+   ══════════════════════════════════════ */
+#scene5 { gap: 28px; }
+.s5-title {
+  font-size: 46px;
+  font-weight: 800;
+  letter-spacing: -1px;
+}
+
+.pricing-tiers {
+  display: flex;
+  gap: 32px;
+}
+.tier-card {
+  width: 320px;
+  padding: 28px 32px;
+  border-radius: 16px;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.06);
+  text-align: center;
+}
+.tier-card.featured {
+  background: rgba(59,130,246,0.08);
+  border-color: rgba(59,130,246,0.3);
+}
+.tier-name {
+  font-size: 24px;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+.tier-price {
+  font-size: 38px;
+  font-weight: 900;
+  font-family: 'JetBrains Mono', monospace;
+}
+.tier-price-sub {
+  font-size: 16px;
+  color: var(--gray);
+  margin-top: 4px;
+}
+.tier-features {
+  list-style: none;
+  margin-top: 14px;
+  text-align: left;
+  font-size: 16px;
+  color: var(--gray);
+  line-height: 1.9;
+}
+.tier-features li::before {
+  content: '✓ ';
+  color: var(--green);
+  font-weight: 700;
+}
+
+.roadmap-row {
+  display: flex;
+  gap: 40px;
+  margin-top: 10px;
+}
+.roadmap-item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  font-size: 22px;
+  font-weight: 500;
+}
+.rm-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.rm-now { background: var(--green); box-shadow: 0 0 12px rgba(52,211,153,0.5); }
+.rm-next { background: var(--blue); box-shadow: 0 0 12px rgba(59,130,246,0.5); }
+.rm-future { background: var(--purple); box-shadow: 0 0 12px rgba(168,85,247,0.5); }
+.rm-label { color: var(--gray); }
+.rm-label strong { color: var(--white); }
+
+/* ══════════════════════════════════════
+   SCENE 6: TEAM (48–54s)
+   ══════════════════════════════════════ */
+#scene6 { gap: 40px; }
+.s6-title {
+  font-size: 50px;
+  font-weight: 800;
+  letter-spacing: -1px;
+}
+.team-cards {
+  display: flex;
+  gap: 50px;
+}
+.team-card {
+  width: 460px;
+  padding: 40px;
+  border-radius: 20px;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.06);
+  text-align: center;
+}
+.tc-avatar {
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+  margin: 0 auto 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 44px;
+  font-weight: 900;
+  color: var(--bg);
+}
+.tc-avatar.a1 { background: linear-gradient(135deg, var(--blue-bright), var(--cyan)); }
+.tc-avatar.a2 { background: linear-gradient(135deg, var(--purple), var(--blue)); }
+.tc-name {
+  font-size: 30px;
+  font-weight: 700;
+}
+.tc-role {
+  font-size: 18px;
+  font-weight: 600;
+  margin-top: 6px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+.tc-role.r1 { color: var(--cyan); }
+.tc-role.r2 { color: var(--purple); }
+.tc-desc {
+  font-size: 19px;
+  color: var(--gray);
+  margin-top: 14px;
+  line-height: 1.5;
+}
+.tc-badge {
+  display: inline-flex;
+  padding: 6px 16px;
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 600;
+  margin-top: 16px;
+  background: rgba(52,211,153,0.12);
+  border: 1px solid rgba(52,211,153,0.3);
+  color: var(--green);
+}
+
+/* ══════════════════════════════════════
+   SCENE 7: CTA + CLOSING (54–60s)
+   ══════════════════════════════════════ */
+#scene7 { gap: 35px; }
+.s7-text {
+  font-size: 54px;
+  font-weight: 700;
+  text-align: center;
+  line-height: 1.3;
+  max-width: 900px;
+}
+.s7-logo {
+  font-size: 130px;
+  font-weight: 900;
+  letter-spacing: -4px;
+  background: linear-gradient(135deg, var(--blue-bright), var(--purple), var(--cyan));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.s7-sub {
+  font-size: 32px;
+  font-weight: 400;
+  color: var(--gray);
+}
+.s7-sub em {
+  font-style: normal;
+  color: var(--white);
+  font-weight: 600;
+}
+.cta-btn {
+  padding: 20px 60px;
+  font-size: 26px;
+  font-weight: 700;
+  font-family: 'Outfit', sans-serif;
+  border: none;
+  border-radius: 14px;
+  background: linear-gradient(135deg, var(--blue), var(--purple));
+  color: white;
+  cursor: pointer;
+  letter-spacing: 1px;
+}
+
+/* ── Draper badge ── */
+.draper-badge {
+  position: absolute;
+  bottom: 40px;
+  right: 60px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 16px;
+  color: var(--gray-dim);
+  opacity: 0;
+}
+.draper-badge.in {
+  opacity: 1;
+  transition: opacity 1s ease;
+}
+</style>
+</head>
+<body>
+<div id="canvas">
+  <canvas id="dotgrid" width="1920" height="1080"></canvas>
+  <div class="ambient ambient-1"></div>
+  <div class="ambient ambient-2"></div>
+  <div class="ambient ambient-3"></div>
+  <div class="scanline"></div>
+
+  <!-- ═══ SCENE 1: HOOK + PROBLEM (0-8s) ═══ -->
+  <div id="scene1" class="scene">
+    <div class="s1-hook fade-up" id="s1hook">
+      Every AI agent needs to<br>do things <span class="gradient-text">later.</span>
+    </div>
+    <div class="s1-sub fade-up" id="s1sub">
+      But scheduling infrastructure is a nightmare to build.<br>
+      Developers waste weeks duct-taping <span class="strike">cron jobs</span>, <span class="strike">queues</span>, and <span class="strike">retry logic</span>.
+    </div>
+    <div class="s1-stat fade-up" id="s1stat">
+      <div class="s1-stat-item">
+        <div class="s1-stat-num gradient-text-2">47M+</div>
+        <div class="s1-stat-label">LangChain downloads</div>
+      </div>
+      <div class="s1-stat-item">
+        <div class="s1-stat-num gradient-text">100K+</div>
+        <div class="s1-stat-label">Agent executions / day (CrewAI)</div>
+      </div>
+      <div class="s1-stat-item">
+        <div class="s1-stat-num gradient-text-3">535%</div>
+        <div class="s1-stat-label">Growth in agent frameworks (YoY)</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ SCENE 2: SOLUTION + LOGO (8-18s) ═══ -->
+  <div id="scene2" class="scene">
+    <div class="logo-ring" id="logoRing"></div>
+    <div class="s2-logo scale-in" id="s2logo">Fliq</div>
+    <div class="s2-tagline fade-up" id="s2tag">Never miss a scheduled task again</div>
+    <div class="s2-desc fade-up" id="s2desc">
+      One API call to <em>schedule</em>, <em>execute</em>, and <em>retry</em><br>
+      any HTTP job. Replace weeks of infra with a single POST.
+    </div>
+  </div>
+
+  <!-- ═══ SCENE 3: HOW IT WORKS (18-30s) ═══ -->
+  <div id="scene3" class="scene">
+    <div class="code-panel">
+      <div class="code-label fade-in" id="codeLabel">One API Call</div>
+      <div class="code-block fade-left" id="codeBlock">
+        <div class="code-line" id="cl1"><span class="code-method">POST</span> <span class="code-url">/jobs</span></div>
+        <div class="code-line" id="cl2">{</div>
+        <div class="code-line" id="cl3">&nbsp;&nbsp;<span class="code-key">"url"</span>: <span class="code-string">"https://api.acme.com/notify"</span>,</div>
+        <div class="code-line" id="cl4">&nbsp;&nbsp;<span class="code-key">"method"</span>: <span class="code-string">"POST"</span>,</div>
+        <div class="code-line" id="cl5">&nbsp;&nbsp;<span class="code-key">"body"</span>: <span class="code-string">"{\"user_id\": 42}"</span>,</div>
+        <div class="code-line" id="cl6">&nbsp;&nbsp;<span class="code-key">"scheduled_at"</span>: <span class="code-string">"2026-03-02T15:30:00Z"</span>,</div>
+        <div class="code-line" id="cl7">&nbsp;&nbsp;<span class="code-key">"max_retries"</span>: <span class="code-num">3</span></div>
+        <div class="code-line" id="cl8">}</div>
+      </div>
+    </div>
+    <div class="timeline-panel">
+      <div class="timeline-track fade-in" id="tlTrack">
+        <div class="timeline-fill" id="tlFill"></div>
+      </div>
+      <div class="tl-step" id="tl1">
+        <div class="tl-dot d1">📋</div>
+        <div><div class="tl-label">Scheduled</div><div class="tl-sublabel">Job queued, fires at 15:30 UTC</div></div>
+      </div>
+      <div class="tl-step" id="tl2">
+        <div class="tl-dot d2">⚡</div>
+        <div><div class="tl-label">Fires on time</div><div class="tl-sublabel">Worker claims via FOR UPDATE SKIP LOCKED</div></div>
+      </div>
+      <div class="tl-step" id="tl3">
+        <div class="tl-dot d3">🔄</div>
+        <div><div class="tl-label">Retries on failure</div><div class="tl-sublabel">Exponential backoff, configurable</div></div>
+      </div>
+      <div class="tl-step" id="tl4">
+        <div class="tl-dot d4">✓</div>
+        <div><div class="tl-label" style="color:var(--green)">Success</div><div class="tl-sublabel">Full attempt history, status callbacks</div></div>
+      </div>
+    </div>
+    <div class="s3-bottom fade-up" id="s3bottom">
+      <span class="gradient-text-2">One API call.</span>&nbsp; Schedule it, walk away.
+    </div>
+  </div>
+
+  <!-- ═══ SCENE 4: MARKET OPPORTUNITY (30-40s) ═══ -->
+  <div id="scene4" class="scene">
+    <div class="s4-title fade-up" id="s4title">
+      <span class="gradient-text">$52.6B</span> market by 2030
+    </div>
+    <div class="market-cards">
+      <div class="market-card fade-up" id="mc1">
+        <div class="mc-number gradient-text">$5.4B</div>
+        <div class="mc-label">AI Agent market today<br>(2024)</div>
+        <div class="mc-source">MarketsandMarkets</div>
+      </div>
+      <div class="market-card fade-up" id="mc2">
+        <div class="mc-number" style="color:var(--cyan)">$52.6B</div>
+        <div class="mc-label">Projected by 2030<br>46.3% CAGR</div>
+        <div class="mc-source">MarketsandMarkets</div>
+      </div>
+      <div class="market-card fade-up" id="mc3">
+        <div class="mc-number" style="color:var(--green)">$236B</div>
+        <div class="mc-label">Extended forecast 2034<br>45.8% CAGR</div>
+        <div class="mc-source">Precedence Research</div>
+      </div>
+    </div>
+    <div class="s4-comp fade-up" id="s4comp">
+      Comparable: <strong>Temporal</strong> — $5B valuation, $650M raised &nbsp;|&nbsp;
+      <strong>Inngest</strong> — $2.5M ARR, a16z-backed
+    </div>
+    <div class="market-bottom fade-up" id="s4bot">
+      <div class="mb-item">
+        <div class="mb-num gradient-text-2">Every</div>
+        <div class="mb-label">AI agent needs scheduling</div>
+      </div>
+      <div class="mb-item">
+        <div class="mb-num gradient-text">Zero</div>
+        <div class="mb-label">want to build it themselves</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ SCENE 5: BUSINESS MODEL + ROADMAP (40-48s) ═══ -->
+  <div id="scene5" class="scene">
+    <div class="s5-title fade-up" id="s5title">Usage-based pricing</div>
+    <div class="pricing-tiers">
+      <div class="tier-card fade-up" id="tier1">
+        <div class="tier-name">Free</div>
+        <div class="tier-price" style="color:var(--gray)">$0</div>
+        <div class="tier-price-sub">forever</div>
+        <ul class="tier-features">
+          <li>1,000 jobs / month</li>
+          <li>3 retries per job</li>
+          <li>Community support</li>
+        </ul>
+      </div>
+      <div class="tier-card featured fade-up" id="tier2">
+        <div class="tier-name" style="color:var(--blue-bright)">Pro</div>
+        <div class="tier-price gradient-text-2">$0.001</div>
+        <div class="tier-price-sub">per job execution</div>
+        <ul class="tier-features">
+          <li>Unlimited jobs</li>
+          <li>Configurable retries & backoff</li>
+          <li>Webhooks & status callbacks</li>
+          <li>Priority support</li>
+        </ul>
+      </div>
+      <div class="tier-card fade-up" id="tier3">
+        <div class="tier-name">Enterprise</div>
+        <div class="tier-price" style="color:var(--purple)">Custom</div>
+        <div class="tier-price-sub">volume discounts</div>
+        <ul class="tier-features">
+          <li>Dedicated infrastructure</li>
+          <li>SLA guarantees</li>
+          <li>SSO & audit logs</li>
+        </ul>
+      </div>
+    </div>
+    <div class="roadmap-row fade-up" id="roadmap">
+      <div class="roadmap-item">
+        <div class="rm-dot rm-now"></div>
+        <div class="rm-label"><strong>Now:</strong> Working MVP, core API</div>
+      </div>
+      <div class="roadmap-item">
+        <div class="rm-dot rm-next"></div>
+        <div class="rm-label"><strong>90 days:</strong> Public beta, 50 users</div>
+      </div>
+      <div class="roadmap-item">
+        <div class="rm-dot rm-future"></div>
+        <div class="rm-label"><strong>6 months:</strong> LangChain + CrewAI SDKs</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ SCENE 6: TEAM (48-54s) ═══ -->
+  <div id="scene6" class="scene">
+    <div class="s6-title fade-up" id="s6title">The Team</div>
+    <div class="team-cards">
+      <div class="team-card fade-up" id="team1">
+        <div class="tc-avatar a1">EB</div>
+        <div class="tc-name">Erlan Belekov</div>
+        <div class="tc-role r1">Founder / Engineer</div>
+        <div class="tc-desc">
+          Senior Software Engineer with 7 years of experience building SaaS products for companies across the globe.
+        </div>
+        <div class="tc-badge">Full-time</div>
+      </div>
+      <div class="team-card fade-up" id="team2">
+        <div class="tc-avatar a2">ER</div>
+        <div class="tc-name">Emirlan Rasulov</div>
+        <div class="tc-role r2">Co-founder / Infrastructure</div>
+        <div class="tc-desc">
+          Senior Software Engineer with vast experience in high-load systems and internal platform/infrastructure development.
+        </div>
+        <div class="tc-badge">Full-time</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ SCENE 7: CTA + CLOSING (54-60s) ═══ -->
+  <div id="scene7" class="scene">
+    <div class="s7-text fade-up" id="s7text">
+      The backbone your<br>AI agents are missing.
+    </div>
+    <div class="s7-logo scale-in" id="s7logo">Fliq</div>
+    <div class="s7-sub fade-in" id="s7sub"><em>Fliq</em> them and move on.</div>
+    <div class="cta-btn fade-up" id="s7cta">Get started at fliq.dev</div>
+  </div>
+
+  <div id="progress-bar"></div>
+</div>
+
+<script>
+// ── Dot grid ──
+const dgCtx = document.getElementById('dotgrid').getContext('2d');
+(function drawDotGrid() {
+  const s = 40;
+  for (let x = s; x < 1920; x += s)
+    for (let y = s; y < 1080; y += s) {
+      dgCtx.beginPath();
+      dgCtx.arc(x, y, 1.1, 0, Math.PI * 2);
+      dgCtx.fillStyle = '#334155';
+      dgCtx.fill();
+    }
+})();
+
+// ── Particles ──
+const particles = [];
+(function spawnParticles() {
+  for (let i = 0; i < 35; i++) {
+    const p = document.createElement('div');
+    p.className = 'particle';
+    p.style.left = Math.random() * 1920 + 'px';
+    p.style.top = Math.random() * 1080 + 'px';
+    p.style.background = ['var(--blue)', 'var(--purple)', 'var(--cyan)'][Math.floor(Math.random() * 3)];
+    document.getElementById('canvas').appendChild(p);
+    particles.push({
+      el: p,
+      x: parseFloat(p.style.left),
+      y: parseFloat(p.style.top),
+      vx: (Math.random() - 0.5) * 0.35,
+      vy: (Math.random() - 0.5) * 0.35,
+      phase: Math.random() * Math.PI * 2
+    });
+  }
+})();
+function animateParticles(t) {
+  particles.forEach(p => {
+    p.x += p.vx; p.y += p.vy;
+    if (p.x < 0) p.x = 1920; if (p.x > 1920) p.x = 0;
+    if (p.y < 0) p.y = 1080; if (p.y > 1080) p.y = 0;
+    p.el.style.left = p.x + 'px';
+    p.el.style.top = p.y + 'px';
+    p.el.style.opacity = Math.sin(t / 1000 + p.phase) * 0.12 + 0.18;
+  });
+  requestAnimationFrame(animateParticles);
+}
+requestAnimationFrame(animateParticles);
+
+// ── Engine ──
+const TOTAL = 60000;
+const progressBar = document.getElementById('progress-bar');
+let startTime;
+const scenes = ['scene1','scene2','scene3','scene4','scene5','scene6','scene7'];
+
+function showScene(i) {
+  scenes.forEach((id, j) => document.getElementById(id).classList.toggle('active', j === i));
+}
+function at(ms, fn) { setTimeout(fn, ms); }
+function show(id, delay) { at(delay, () => document.getElementById(id).classList.add('in')); }
+
+function updateProgress(now) {
+  const pct = Math.min(((now - startTime) / TOTAL) * 100, 100);
+  progressBar.style.width = pct + '%';
+  if (pct < 100) requestAnimationFrame(updateProgress);
+}
+
+function runAd() {
+  startTime = performance.now();
+  requestAnimationFrame(updateProgress);
+  document.querySelectorAll('.ambient').forEach(a => a.classList.add('on'));
+  document.querySelector('.scanline').classList.add('on');
+
+  // ═══ SCENE 1: HOOK + PROBLEM (0-8s) ═══
+  at(0, () => showScene(0));
+  show('s1hook', 300);
+  show('s1sub', 1800);
+  show('s1stat', 3500);
+
+  // ═══ SCENE 2: SOLUTION + LOGO (8-18s) ═══
+  at(8000, () => showScene(1));
+  at(8200, () => {
+    const ring = document.getElementById('logoRing');
+    ring.classList.add('flash');
+    setTimeout(() => { ring.classList.remove('flash'); ring.classList.add('expand'); }, 150);
+  });
+  show('s2logo', 8400);
+  show('s2tag', 9500);
+  show('s2desc', 10800);
+
+  // ═══ SCENE 3: HOW IT WORKS (18-30s) ═══
+  at(18000, () => showScene(2));
+  show('codeLabel', 18300);
+  show('codeBlock', 18500);
+  ['cl1','cl2','cl3','cl4','cl5','cl6','cl7','cl8'].forEach((id, i) => {
+    at(19000 + i * 320, () => document.getElementById(id).classList.add('typed'));
+  });
+  show('tlTrack', 21500);
+  at(22000, () => { document.getElementById('tl1').classList.add('in'); document.getElementById('tlFill').style.height = '25%'; });
+  at(23000, () => { document.getElementById('tl2').classList.add('in'); document.getElementById('tlFill').style.height = '50%'; });
+  at(24000, () => { document.getElementById('tl3').classList.add('in'); document.getElementById('tlFill').style.height = '75%'; });
+  at(25000, () => { document.getElementById('tl4').classList.add('in'); document.getElementById('tlFill').style.height = '100%'; });
+  show('s3bottom', 26500);
+
+  // ═══ SCENE 4: MARKET (30-40s) ═══
+  at(30000, () => showScene(3));
+  show('s4title', 30300);
+  show('mc1', 31000);
+  show('mc2', 31600);
+  show('mc3', 32200);
+  show('s4comp', 34000);
+  show('s4bot', 36000);
+
+  // ═══ SCENE 5: BUSINESS MODEL (40-48s) ═══
+  at(40000, () => showScene(4));
+  show('s5title', 40300);
+  show('tier1', 41000);
+  show('tier2', 41500);
+  show('tier3', 42000);
+  show('roadmap', 44000);
+
+  // ═══ SCENE 6: TEAM (48-54s) ═══
+  at(48000, () => showScene(5));
+  show('s6title', 48300);
+  show('team1', 49000);
+  show('team2', 49600);
+
+  // ═══ SCENE 7: CTA (54-60s) ═══
+  at(54000, () => showScene(6));
+  show('s7text', 54300);
+  show('s7logo', 55500);
+  show('s7sub', 57000);
+  show('s7cta', 58000);
+}
+
+window.addEventListener('load', () => setTimeout(runAd, 500));
+</script>
+</body>
+</html>
