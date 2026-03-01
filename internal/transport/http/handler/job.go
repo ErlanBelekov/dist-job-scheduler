@@ -87,7 +87,7 @@ func (h *JobHandler) Cancel(ctx *gin.Context) {
 		case errors.Is(err, domain.ErrJobNotCancellable):
 			ctx.JSON(http.StatusConflict, gin.H{"error": errJobNotCancellable})
 		default:
-			h.logger.Error("cancel job", "job_id", jobID, "error", err)
+			h.logger.ErrorContext(ctx.Request.Context(), "cancel job", "job_id", jobID, "error", err)
 			ctx.JSON(http.StatusInternalServerError, gin.H{"error": errInternalServer})
 		}
 		return
@@ -110,7 +110,7 @@ func (h *JobHandler) List(ctx *gin.Context) {
 			ctx.JSON(http.StatusBadRequest, gin.H{"error": errInvalidStatus})
 			return
 		}
-		h.logger.Error("list jobs", "error", err)
+		h.logger.ErrorContext(ctx.Request.Context(), "list jobs", "error", err)
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": errInternalServer})
 		return
 	}
@@ -158,7 +158,7 @@ func (h *JobHandler) Create(ctx *gin.Context) {
 			ctx.JSON(http.StatusBadRequest, gin.H{"error": errDuplicateJob})
 			return
 		}
-		h.logger.Error("create job", "error", err)
+		h.logger.ErrorContext(ctx.Request.Context(), "create job", "error", err)
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": errInternalServer})
 		return
 	}
@@ -178,7 +178,7 @@ func (h *JobHandler) ListAttempts(ctx *gin.Context) {
 			ctx.JSON(http.StatusNotFound, gin.H{"error": errJobNotFound})
 			return
 		}
-		h.logger.Error("list attempts", "job_id", jobID, "error", err)
+		h.logger.ErrorContext(ctx.Request.Context(), "list attempts", "job_id", jobID, "error", err)
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": errInternalServer})
 		return
 	}
@@ -209,7 +209,7 @@ func (h *JobHandler) GetByID(ctx *gin.Context) {
 			ctx.JSON(http.StatusNotFound, gin.H{"error": errJobNotFound})
 			return
 		}
-		h.logger.Error("get job by id", "job_id", jobID, "error", err)
+		h.logger.ErrorContext(ctx.Request.Context(), "get job by id", "job_id", jobID, "error", err)
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": errInternalServer})
 		return
 	}

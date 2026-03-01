@@ -15,11 +15,14 @@ import (
 	"github.com/ErlanBelekov/dist-job-scheduler/internal/email"
 	"github.com/ErlanBelekov/dist-job-scheduler/internal/health"
 	"github.com/ErlanBelekov/dist-job-scheduler/internal/infrastructure/postgres"
+	ctxlog "github.com/ErlanBelekov/dist-job-scheduler/internal/log"
 	"github.com/ErlanBelekov/dist-job-scheduler/internal/metrics"
-	"github.com/prometheus/client_golang/prometheus"
 	httptransport "github.com/ErlanBelekov/dist-job-scheduler/internal/transport/http"
 	"github.com/ErlanBelekov/dist-job-scheduler/internal/transport/http/handler"
 	"github.com/ErlanBelekov/dist-job-scheduler/internal/usecase"
+	"github.com/gin-gonic/gin"
+	"github.com/lmittmann/tint"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 func main() {
@@ -28,7 +31,11 @@ func main() {
 		log.Fatalf("config error: %v", err)
 	}
 
-	logger := newLogger(cfg.Env)
+	logger := newLogger(cfg.Env, cfg.SlogLevel())
+
+	if cfg.Env != "local" {
+		gin.SetMode(gin.ReleaseMode)
+	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 
@@ -56,7 +63,7 @@ func main() {
 
 	srv := http.Server{
 		Addr:    ":" + cfg.Port,
-		Handler: httptransport.NewRouter(jobHandler, authHandler, []byte(cfg.JWTSecret)),
+		Handler: httptransport.NewRouter(logger, jobHandler, authHandler, []byte(cfg.JWTSecret)),
 	}
 
 	metricsSrv := metrics.NewServer(":"+cfg.MetricsPort, checker)
@@ -89,9 +96,17 @@ func main() {
 	}
 }
 
-func newLogger(env string) *slog.Logger {
+func newLogger(env string, level slog.Level) *slog.Logger {
+	var inner slog.Handler
 	if env == "local" {
-		return slog.New(slog.NewTextHandler(os.Stdout, nil))
+		inner = tint.NewHandler(os.Stdout, &tint.Options{
+			Level:      level,
+			TimeFormat: time.Kitchen,
+		})
+	} else {
+		inner = slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
+			Level: level,
+		})
 	}
-	return slog.New(slog.NewJSONHandler(os.Stdout, nil))
+	return slog.New(ctxlog.NewContextHandler(inner))
 }

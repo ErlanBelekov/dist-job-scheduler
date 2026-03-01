@@ -14,8 +14,10 @@ import (
 	"github.com/ErlanBelekov/dist-job-scheduler/config"
 	"github.com/ErlanBelekov/dist-job-scheduler/internal/health"
 	"github.com/ErlanBelekov/dist-job-scheduler/internal/infrastructure/postgres"
+	ctxlog "github.com/ErlanBelekov/dist-job-scheduler/internal/log"
 	"github.com/ErlanBelekov/dist-job-scheduler/internal/metrics"
 	"github.com/ErlanBelekov/dist-job-scheduler/internal/scheduler"
+	"github.com/lmittmann/tint"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -25,7 +27,7 @@ func main() {
 		log.Fatalf("config: %v", err)
 	}
 
-	logger := newLogger(cfg.Env)
+	logger := newLogger(cfg.Env, cfg.SlogLevel())
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 
@@ -77,9 +79,17 @@ func main() {
 	logger.Info("scheduler shut down")
 }
 
-func newLogger(env string) *slog.Logger {
+func newLogger(env string, level slog.Level) *slog.Logger {
+	var inner slog.Handler
 	if env == "local" {
-		return slog.New(slog.NewTextHandler(os.Stdout, nil))
+		inner = tint.NewHandler(os.Stdout, &tint.Options{
+			Level:      level,
+			TimeFormat: time.Kitchen,
+		})
+	} else {
+		inner = slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
+			Level: level,
+		})
 	}
-	return slog.New(slog.NewJSONHandler(os.Stdout, nil))
+	return slog.New(ctxlog.NewContextHandler(inner))
 }

@@ -39,7 +39,7 @@ func NewWorker(
 		id:           id,
 		repo:         repo,
 		attempts:     attempts,
-		executor:     NewExecutor(),
+		executor:     NewExecutor(logger),
 		logger:       logger.With("worker_id", id),
 		pollInterval: pollInterval,
 		concurrency:  concurrency,
@@ -53,13 +53,13 @@ func (w *Worker) Start(ctx context.Context) {
 	ticker := time.NewTicker(w.pollInterval)
 	defer ticker.Stop()
 
-	w.logger.Info("worker started", "concurrency", w.concurrency)
+	w.logger.InfoContext(ctx, "worker started", "concurrency", w.concurrency)
 
 	for {
 		select {
 		case <-ctx.Done():
 			metrics.WorkerShutdownsTotal.Inc()
-			w.logger.Info("worker shut down")
+			w.logger.InfoContext(ctx, "worker shut down")
 			return
 		case <-ticker.C:
 			w.processBatch(ctx)
@@ -75,7 +75,7 @@ func (w *Worker) processBatch(ctx context.Context) {
 
 	jobs, err := w.repo.Claim(ctx, w.id, available)
 	if err != nil {
-		w.logger.Error("claim jobs", "error", err)
+		w.logger.ErrorContext(ctx, "claim jobs", "error", err)
 		return
 	}
 
@@ -83,7 +83,7 @@ func (w *Worker) processBatch(ctx context.Context) {
 		return
 	}
 
-	w.logger.Info("claimed jobs", "count", len(jobs), "slots_used", len(w.sem)+len(jobs), "slots_total", cap(w.sem))
+	w.logger.InfoContext(ctx, "claimed jobs", "count", len(jobs), "slots_used", len(w.sem)+len(jobs), "slots_total", cap(w.sem))
 
 	for _, job := range jobs {
 		w.sem <- struct{}{}
@@ -114,7 +114,7 @@ func (w *Worker) runJob(ctx context.Context, job *domain.Job) {
 		// writes (Complete/Reschedule/Fail) will fail too. Return now — the job
 		// stays in "running" status, the heartbeat stops, and the reaper will
 		// reschedule it to "pending" after the stale cutoff.
-		w.logger.Error("create attempt record, aborting run — reaper will reschedule", "job_id", job.ID, "error", err)
+		w.logger.ErrorContext(ctx, "create attempt record, aborting run — reaper will reschedule", "job_id", job.ID, "error", err)
 		return
 	}
 
@@ -122,7 +122,7 @@ func (w *Worker) runJob(ctx context.Context, job *domain.Job) {
 	defer cancelHeartbeat()
 	go w.heartbeat(heartbeatCtx, job.ID)
 
-	w.logger.Info("executing job", "job_id", job.ID, "method", job.Method, "url", job.URL)
+	w.logger.InfoContext(ctx, "executing job", "job_id", job.ID, "method", job.Method, "url", job.URL)
 
 	result := w.executor.Run(ctx, job)
 	durationMS := time.Since(startedAt).Milliseconds()
@@ -132,9 +132,9 @@ func (w *Worker) runJob(ctx context.Context, job *domain.Job) {
 		metrics.JobsCompletedTotal.WithLabelValues("success").Inc()
 		w.closeAttempt(ctx, attempt, &result.StatusCode, nil, durationMS)
 		if err := w.repo.Complete(ctx, job.ID); err != nil {
-			w.logger.Error("mark job complete", "job_id", job.ID, "error", err)
+			w.logger.ErrorContext(ctx, "mark job complete", "job_id", job.ID, "error", err)
 		}
-		w.logger.Info("job completed", "job_id", job.ID, "duration", result.Duration)
+		w.logger.InfoContext(ctx, "job completed", "job_id", job.ID, "duration", result.Duration)
 		return
 	}
 
@@ -155,10 +155,10 @@ func (w *Worker) runJob(ctx context.Context, job *domain.Job) {
 	if job.RetryCount < job.MaxRetries {
 		retryAt := time.Now().Add(retryDelay(job.Backoff, job.RetryCount))
 		if err := w.repo.Reschedule(ctx, job.ID, errMsg, retryAt); err != nil {
-			w.logger.Error("reschedule job", "job_id", job.ID, "error", err)
+			w.logger.ErrorContext(ctx, "reschedule job", "job_id", job.ID, "error", err)
 		}
 		metrics.JobsCompletedTotal.WithLabelValues("retry").Inc()
-		w.logger.Warn("job failed, will retry",
+		w.logger.WarnContext(ctx, "job failed, will retry",
 			"job_id", job.ID,
 			"error", errMsg,
 			"attempt", job.RetryCount+1,
@@ -167,17 +167,17 @@ func (w *Worker) runJob(ctx context.Context, job *domain.Job) {
 		)
 	} else {
 		if err := w.repo.Fail(ctx, job.ID, errMsg); err != nil {
-			w.logger.Error("mark job failed", "job_id", job.ID, "error", err)
+			w.logger.ErrorContext(ctx, "mark job failed", "job_id", job.ID, "error", err)
 		}
 		metrics.JobsCompletedTotal.WithLabelValues("failed").Inc()
-		w.logger.Warn("job permanently failed", "job_id", job.ID, "error", errMsg)
+		w.logger.WarnContext(ctx, "job permanently failed", "job_id", job.ID, "error", errMsg)
 	}
 }
 
 // closeAttempt writes the execution outcome to the attempt record.
 func (w *Worker) closeAttempt(ctx context.Context, attempt *domain.JobAttempt, statusCode *int, errMsg *string, durationMS int64) {
 	if err := w.attempts.CompleteAttempt(ctx, attempt.ID, statusCode, errMsg, durationMS); err != nil {
-		w.logger.Error("complete attempt record", "job_id", attempt.JobID, "error", err)
+		w.logger.ErrorContext(ctx, "complete attempt record", "job_id", attempt.JobID, "error", err)
 	}
 }
 
@@ -190,7 +190,7 @@ func (w *Worker) heartbeat(ctx context.Context, jobID string) {
 			return
 		case <-ticker.C:
 			if err := w.repo.UpdateHeartbeat(ctx, jobID); err != nil {
-				w.logger.Warn("heartbeat failed", "job_id", jobID, "error", err)
+				w.logger.WarnContext(ctx, "heartbeat failed", "job_id", jobID, "error", err)
 			}
 		}
 	}
