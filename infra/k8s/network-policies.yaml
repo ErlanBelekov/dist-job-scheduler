@@ -50,6 +50,9 @@ spec:
         - podSelector:
             matchLabels:
               app: scheduler
+        - podSelector:
+            matchLabels:
+              app: migrate
       ports:
         - port: 5432
           protocol: TCP
