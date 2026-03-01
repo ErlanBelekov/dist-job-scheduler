@@ -2,9 +2,9 @@ package handler
 
 import (
 	"errors"
-	"fmt"
 	"log/slog"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/ErlanBelekov/dist-job-scheduler/internal/domain"
@@ -77,9 +77,7 @@ type attemptResponse struct {
 }
 
 func (h *JobHandler) List(ctx *gin.Context) {
-	limitStr := ctx.DefaultQuery("limit", "0")
-	var limit int
-	fmt.Sscan(limitStr, &limit)
+	limit, _ := strconv.Atoi(ctx.Query("limit"))
 
 	result, err := h.jobUsecase.ListJobs(ctx.Request.Context(), usecase.ListJobsInput{
 		UserID: ctx.GetString("userID"),
