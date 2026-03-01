@@ -12,9 +12,11 @@ import (
 	"time"
 
 	"github.com/ErlanBelekov/dist-job-scheduler/config"
+	"github.com/ErlanBelekov/dist-job-scheduler/internal/health"
 	"github.com/ErlanBelekov/dist-job-scheduler/internal/infrastructure/postgres"
 	"github.com/ErlanBelekov/dist-job-scheduler/internal/metrics"
 	"github.com/ErlanBelekov/dist-job-scheduler/internal/scheduler"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 func main() {
@@ -37,6 +39,7 @@ func main() {
 	logger.Info("db connected")
 
 	metrics.Register()
+	checker := health.NewChecker(pool, logger, prometheus.DefaultRegisterer)
 
 	jobRepo := postgres.NewJobRepository(pool)
 	attemptRepo := postgres.NewAttemptRepository(pool)
@@ -54,7 +57,7 @@ func main() {
 	reaper := scheduler.NewReaper(jobRepo, logger, 30*time.Second, 30*time.Second)
 	go reaper.Start(ctx)
 
-	metricsSrv := metrics.NewServer(":" + cfg.MetricsPort)
+	metricsSrv := metrics.NewServer(":"+cfg.MetricsPort, checker)
 	go func() {
 		logger.Info("metrics server started", "port", cfg.MetricsPort)
 		if err := metricsSrv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {

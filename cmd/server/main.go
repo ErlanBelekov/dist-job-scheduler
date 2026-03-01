@@ -13,8 +13,10 @@ import (
 
 	"github.com/ErlanBelekov/dist-job-scheduler/config"
 	"github.com/ErlanBelekov/dist-job-scheduler/internal/email"
+	"github.com/ErlanBelekov/dist-job-scheduler/internal/health"
 	"github.com/ErlanBelekov/dist-job-scheduler/internal/infrastructure/postgres"
 	"github.com/ErlanBelekov/dist-job-scheduler/internal/metrics"
+	"github.com/prometheus/client_golang/prometheus"
 	httptransport "github.com/ErlanBelekov/dist-job-scheduler/internal/transport/http"
 	"github.com/ErlanBelekov/dist-job-scheduler/internal/transport/http/handler"
 	"github.com/ErlanBelekov/dist-job-scheduler/internal/usecase"
@@ -50,13 +52,14 @@ func main() {
 	authHandler := handler.NewAuthHandler(authUsecase, logger)
 
 	metrics.Register()
+	checker := health.NewChecker(pool, logger, prometheus.DefaultRegisterer)
 
 	srv := http.Server{
 		Addr:    ":" + cfg.Port,
 		Handler: httptransport.NewRouter(jobHandler, authHandler, []byte(cfg.JWTSecret)),
 	}
 
-	metricsSrv := metrics.NewServer(":" + cfg.MetricsPort)
+	metricsSrv := metrics.NewServer(":"+cfg.MetricsPort, checker)
 
 	go func() {
 		logger.Info("server started", "port", cfg.Port)

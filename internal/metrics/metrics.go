@@ -1,8 +1,10 @@
 package metrics
 
 import (
+	"encoding/json"
 	"net/http"
 
+	"github.com/ErlanBelekov/dist-job-scheduler/internal/health"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
@@ -96,8 +98,24 @@ func Register() {
 	)
 }
 
-func NewServer(addr string) *http.Server {
+func NewServer(addr string, checker *health.Checker) *http.Server {
 	mux := http.NewServeMux()
 	mux.Handle("/metrics", promhttp.Handler())
+
+	mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
+		writeHealth(w, checker.Liveness(r.Context()))
+	})
+	mux.HandleFunc("/readyz", func(w http.ResponseWriter, r *http.Request) {
+		writeHealth(w, checker.Readiness(r.Context()))
+	})
+
 	return &http.Server{Addr: addr, Handler: mux}
+}
+
+func writeHealth(w http.ResponseWriter, result health.HealthResult) {
+	w.Header().Set("Content-Type", "application/json")
+	if result.Status != "up" {
+		w.WriteHeader(http.StatusServiceUnavailable)
+	}
+	_ = json.NewEncoder(w).Encode(result)
 }
