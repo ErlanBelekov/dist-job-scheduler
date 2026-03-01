@@ -1,0 +1,85 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+
+env:
+  REGISTRY: europe-west3-docker.pkg.dev/notifylm/dist-scheduler
+
+jobs:
+  build-and-push:
+    name: Build & Push Images
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    strategy:
+      matrix:
+        include:
+          - image: server
+            dockerfile: Dockerfile.server
+          - image: scheduler
+            dockerfile: Dockerfile.scheduler
+          - image: migrate
+            dockerfile: Dockerfile.migrate
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker europe-west3-docker.pkg.dev --quiet
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ matrix.image }}:latest
+            ${{ env.REGISTRY }}/${{ matrix.image }}:sha-${{ github.sha }}
+
+  deploy:
+    name: Deploy to k3s
+    needs: build-and-push
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up kubectl
+        run: |
+          mkdir -p ~/.kube
+          echo "${{ secrets.KUBECONFIG_DATA }}" | base64 -d > ~/.kube/config
+          chmod 600 ~/.kube/config
+
+      - name: Apply manifests
+        run: |
+          kubectl apply -f infra/k8s/namespace.yaml
+          kubectl apply -f infra/k8s/configmap.yaml
+          kubectl apply -f infra/k8s/postgres.yaml
+
+      - name: Run migrations
+        run: |
+          kubectl delete job migrate -n dist-scheduler --ignore-not-found
+          kubectl apply -f infra/k8s/migrate-job.yaml
+          kubectl wait --for=condition=Complete job/migrate -n dist-scheduler --timeout=60s
+
+      - name: Deploy application
+        run: |
+          kubectl apply -f infra/k8s/server.yaml
+          kubectl apply -f infra/k8s/scheduler.yaml
+          kubectl apply -f infra/k8s/ingress.yaml
+          kubectl rollout restart deployment/server -n dist-scheduler
+          kubectl rollout restart deployment/scheduler -n dist-scheduler
+
+      - name: Wait for rollout
+        run: |
+          kubectl rollout status deployment/server -n dist-scheduler --timeout=120s
+          kubectl rollout status deployment/scheduler -n dist-scheduler --timeout=120s

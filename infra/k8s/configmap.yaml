@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dist-scheduler
+  namespace: dist-scheduler
+data:
+  ENV: "production"
+  PORT: "8080"
+  WORKER_COUNT: "5"
+  POLL_INTERVAL_SEC: "1"
