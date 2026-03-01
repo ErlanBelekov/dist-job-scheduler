@@ -55,6 +55,7 @@ func (h *JobHandler) Create(ctx *gin.Context) {
 	}
 
 	job, err := h.jobUsecase.CreateJob(ctx.Request.Context(), usecase.CreateJobInput{
+		UserID:         ctx.GetString("userID"),
 		IdempotencyKey: req.IdempotencyKey,
 		URL:            req.URL,
 		Method:         req.Method,
@@ -84,7 +85,7 @@ func (h *JobHandler) Create(ctx *gin.Context) {
 func (h *JobHandler) GetByID(ctx *gin.Context) {
 	jobID := ctx.Param("id")
 
-	job, err := h.jobUsecase.GetByID(ctx.Request.Context(), jobID)
+	job, err := h.jobUsecase.GetByID(ctx.Request.Context(), jobID, ctx.GetString("userID"))
 	if err != nil {
 		if errors.Is(err, domain.ErrJobNotFound) {
 			ctx.JSON(http.StatusNotFound, gin.H{"error": errJobNotFound})
