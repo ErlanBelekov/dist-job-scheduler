@@ -20,7 +20,12 @@ type Config struct {
 	MetricsPort string `env:"METRICS_PORT" envDefault:"9090"`
 	LogLevel    string `env:"LOG_LEVEL" envDefault:"info" validate:"required,oneof=debug info warn error"`
 
-	JWTSecret     string `env:"JWT_SECRET,required"   validate:"required,min=32"`
+	// ClerkJWKSURL is the JWKS endpoint for RS256 token verification (Clerk).
+	// When set, it takes precedence over JWTSecret.
+	ClerkJWKSURL string `env:"CLERK_JWKS_URL"`
+
+	// JWTSecret is kept for local dev / migration period.
+	JWTSecret     string `env:"JWT_SECRET"`
 	ResendAPIKey  string `env:"RESEND_API_KEY"         validate:"required_if=Env production,required_if=Env staging"`
 	ResendFrom    string `env:"RESEND_FROM"            validate:"required_if=Env production,required_if=Env staging"`
 	MagicLinkBase string `env:"MAGIC_LINK_BASE_URL"    envDefault:"http://localhost:8080"`
