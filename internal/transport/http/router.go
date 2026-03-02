@@ -3,6 +3,7 @@ package httptransport
 import (
 	"log/slog"
 
+	"github.com/ErlanBelekov/dist-job-scheduler/internal/repository"
 	"github.com/ErlanBelekov/dist-job-scheduler/internal/transport/http/handler"
 	"github.com/ErlanBelekov/dist-job-scheduler/internal/transport/http/middleware"
 	"github.com/gin-gonic/gin"
@@ -10,7 +11,7 @@ import (
 	sloggin "github.com/samber/slog-gin"
 )
 
-func NewRouter(logger *slog.Logger, jobHandler *handler.JobHandler, authHandler *handler.AuthHandler, scheduleHandler *handler.ScheduleHandler, jwtKey []byte) *gin.Engine {
+func NewRouter(logger *slog.Logger, jobHandler *handler.JobHandler, scheduleHandler *handler.ScheduleHandler, userRepo repository.UserRepository, jwksURL string, hmacKey []byte) *gin.Engine {
 	r := gin.New()
 	r.Use(gin.Recovery())
 	r.Use(middleware.RequestID())
@@ -18,12 +19,11 @@ func NewRouter(logger *slog.Logger, jobHandler *handler.JobHandler, authHandler 
 	r.Use(sloggin.New(logger))
 	r.Use(middleware.Metrics())
 
-	// Public auth routes
-	r.POST("/auth/magic-link", authHandler.RequestMagicLink)
-	r.GET("/auth/verify", authHandler.Verify)
+	authMW := middleware.Auth(jwksURL, hmacKey)
+	ensureUser := middleware.EnsureUser(userRepo, logger)
 
 	// Protected job routes
-	jobs := r.Group("/jobs", middleware.Auth(jwtKey))
+	jobs := r.Group("/jobs", authMW, ensureUser)
 	jobs.GET("", jobHandler.List)
 	jobs.POST("", jobHandler.Create)
 	jobs.GET("/:id", jobHandler.GetByID)
@@ -31,7 +31,7 @@ func NewRouter(logger *slog.Logger, jobHandler *handler.JobHandler, authHandler 
 	jobs.GET("/:id/attempts", jobHandler.ListAttempts)
 
 	// Protected schedule routes
-	schedules := r.Group("/schedules", middleware.Auth(jwtKey))
+	schedules := r.Group("/schedules", authMW, ensureUser)
 	schedules.POST("", scheduleHandler.Create)
 	schedules.GET("", scheduleHandler.List)
 	schedules.GET("/:id", scheduleHandler.GetByID)

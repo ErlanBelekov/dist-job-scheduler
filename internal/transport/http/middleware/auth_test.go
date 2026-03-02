@@ -22,7 +22,7 @@ func init() {
 // The handler writes the userID from context so we can assert it was set.
 func newEngine() *gin.Engine {
 	r := gin.New()
-	r.GET("/protected", middleware.Auth([]byte(testKey)), func(c *gin.Context) {
+	r.GET("/protected", middleware.Auth("", []byte(testKey)), func(c *gin.Context) {
 		userID, _ := c.Get("userID")
 		c.String(http.StatusOK, "%v", userID)
 	})

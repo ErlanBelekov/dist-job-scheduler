@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/ErlanBelekov/dist-job-scheduler/config"
-	"github.com/ErlanBelekov/dist-job-scheduler/internal/email"
 	"github.com/ErlanBelekov/dist-job-scheduler/internal/health"
 	"github.com/ErlanBelekov/dist-job-scheduler/internal/infrastructure/postgres"
 	ctxlog "github.com/ErlanBelekov/dist-job-scheduler/internal/log"
@@ -46,6 +45,9 @@ func main() {
 	}
 	defer pool.Close()
 
+	// Users
+	userRepo := postgres.NewUserRepository(pool)
+
 	// Jobs
 	jobRepo := postgres.NewJobRepository(pool)
 	attemptRepo := postgres.NewAttemptRepository(pool)
@@ -57,18 +59,12 @@ func main() {
 	scheduleUsecase := usecase.NewScheduleUsecase(scheduleRepo, jobRepo)
 	scheduleHandler := handler.NewScheduleHandler(scheduleUsecase, logger)
 
-	// Auth
-	userRepo := postgres.NewUserRepository(pool)
-	emailSender := email.NewSender(cfg.Env, cfg.ResendAPIKey, cfg.ResendFrom, logger)
-	authUsecase := usecase.NewAuthUsecase(userRepo, emailSender, []byte(cfg.JWTSecret), cfg.MagicLinkBase)
-	authHandler := handler.NewAuthHandler(authUsecase, logger)
-
 	metrics.Register()
 	checker := health.NewChecker(pool, logger, prometheus.DefaultRegisterer)
 
 	srv := http.Server{
 		Addr:    ":" + cfg.Port,
-		Handler: httptransport.NewRouter(logger, jobHandler, authHandler, scheduleHandler, []byte(cfg.JWTSecret)),
+		Handler: httptransport.NewRouter(logger, jobHandler, scheduleHandler, userRepo, cfg.ClerkJWKSURL, []byte(cfg.JWTSecret)),
 	}
 
 	metricsSrv := metrics.NewServer(":"+cfg.MetricsPort, checker)
