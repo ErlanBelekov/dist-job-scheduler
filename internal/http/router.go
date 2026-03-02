@@ -4,8 +4,8 @@ import (
 	"log/slog"
 
 	"github.com/ErlanBelekov/dist-job-scheduler/internal/repository"
-	"github.com/ErlanBelekov/dist-job-scheduler/internal/transport/http/handler"
-	"github.com/ErlanBelekov/dist-job-scheduler/internal/transport/http/middleware"
+	"github.com/ErlanBelekov/dist-job-scheduler/internal/http/handler"
+	"github.com/ErlanBelekov/dist-job-scheduler/internal/http/middleware"
 	"github.com/gin-gonic/gin"
 
 	sloggin "github.com/samber/slog-gin"
