@@ -24,11 +24,8 @@ type Config struct {
 	// When set, it takes precedence over JWTSecret.
 	ClerkJWKSURL string `env:"CLERK_JWKS_URL"`
 
-	// JWTSecret is kept for local dev / migration period.
-	JWTSecret     string `env:"JWT_SECRET"`
-	ResendAPIKey  string `env:"RESEND_API_KEY"         validate:"required_if=Env production,required_if=Env staging"`
-	ResendFrom    string `env:"RESEND_FROM"            validate:"required_if=Env production,required_if=Env staging"`
-	MagicLinkBase string `env:"MAGIC_LINK_BASE_URL"    envDefault:"http://localhost:8080"`
+	// JWTSecret is used for HS256 verification in local dev (when ClerkJWKSURL is empty).
+	JWTSecret string `env:"JWT_SECRET"`
 }
 
 func Load() (*Config, error) {

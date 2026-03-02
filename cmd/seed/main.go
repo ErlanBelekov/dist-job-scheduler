@@ -12,7 +12,8 @@ import (
 	"github.com/ErlanBelekov/dist-job-scheduler/internal/infrastructure/postgres"
 )
 
-const seedEmail = "seed@test.local"
+// seedUserID is a fixed Clerk-style user ID for local dev seeding.
+const seedUserID = "user_seed_dev_local"
 
 type jobSpec struct {
 	key     string
@@ -68,18 +69,14 @@ func main() {
 	if err != nil {
 		log.Fatalf("db connect: %v", err)
 	}
+	defer pool.Close()
 
-	// Upsert test user
-	var userID string
-	err = pool.QueryRow(ctx, `
-		INSERT INTO users (email)
-		VALUES ($1)
-		ON CONFLICT (email) DO UPDATE SET updated_at = NOW()
-		RETURNING id`,
-		seedEmail,
-	).Scan(&userID)
+	// Upsert seed user by Clerk-style ID (no email — matches new schema)
+	_, err = pool.Exec(ctx,
+		`INSERT INTO users (id) VALUES ($1) ON CONFLICT (id) DO NOTHING`,
+		seedUserID,
+	)
 	if err != nil {
-		pool.Close()
 		log.Fatalf("upsert user: %v", err)
 	}
 
@@ -98,11 +95,10 @@ func main() {
 			) VALUES ($1, $2, $3, $4, '{}', 30, 'pending', $5, $6, $7)
 			ON CONFLICT (user_id, idempotency_key) DO NOTHING
 			RETURNING id`,
-			userID, spec.key, spec.url, spec.method,
+			seedUserID, spec.key, spec.url, spec.method,
 			scheduledAt, spec.retries, spec.backoff,
 		).Scan(&id)
 		if err != nil {
-			pool.Close()
 			log.Fatalf("insert job %s: %v", spec.key, err)
 		}
 		if id == "" {
@@ -113,12 +109,9 @@ func main() {
 		}
 	}
 
-	pool.Close()
-
 	fmt.Println("Seed complete")
 	fmt.Println()
-	fmt.Printf("  User:         %s\n", seedEmail)
-	fmt.Printf("  User ID:      %s\n", userID)
+	fmt.Printf("  User ID:      %s\n", seedUserID)
 	fmt.Printf("  Jobs created: %d  (skipped %d already existing)\n", inserted, skipped)
 	fmt.Printf("  Scheduled at: %s  (~1 minute from now)\n", scheduledAt.Format(time.RFC3339))
 	fmt.Println()
@@ -137,16 +130,12 @@ func main() {
 	fmt.Println()
 	fmt.Println("How to test:")
 	fmt.Println()
-	fmt.Println("  Step 1 — get a JWT for the seed user:")
+	fmt.Println("  Step 1 — get a Clerk JWT for the seed user:")
 	fmt.Println()
-	fmt.Printf("    curl -s -X POST http://localhost:8080/auth/magic-link \\\n")
-	fmt.Printf("      -H 'Content-Type: application/json' \\\n")
-	fmt.Printf("      -d '{\"email\":\"%s\"}'\n", seedEmail)
+	fmt.Println("    Sign in via your Clerk dashboard or frontend to obtain a JWT.")
+	fmt.Println("    For local HS256 testing, generate a token signed with JWT_SECRET:")
 	fmt.Println()
-	fmt.Println("    # Copy the token from the server log, then:")
-	fmt.Println()
-	fmt.Println("    curl -s 'http://localhost:8080/auth/verify?token=TOKEN'")
-	fmt.Println("    # → {\"token\":\"eyJ...\"}")
+	fmt.Printf("    JWT_SECRET from .envrc, sub=%q\n", seedUserID)
 	fmt.Println()
 	fmt.Println("  Step 2 — query a job (use any ID from above):")
 	fmt.Println()
