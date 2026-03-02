@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ErlanBelekov/dist-job-scheduler/internal/transport/http/middleware"
+	"github.com/ErlanBelekov/dist-job-scheduler/internal/http/middleware"
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 )
