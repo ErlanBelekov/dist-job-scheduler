@@ -69,7 +69,6 @@ func main() {
 	if err != nil {
 		log.Fatalf("db connect: %v", err)
 	}
-	defer pool.Close()
 
 	// Upsert seed user by Clerk-style ID (no email — matches new schema)
 	_, err = pool.Exec(ctx,
@@ -77,6 +76,7 @@ func main() {
 		seedUserID,
 	)
 	if err != nil {
+		pool.Close()
 		log.Fatalf("upsert user: %v", err)
 	}
 
@@ -99,6 +99,7 @@ func main() {
 			scheduledAt, spec.retries, spec.backoff,
 		).Scan(&id)
 		if err != nil {
+			pool.Close()
 			log.Fatalf("insert job %s: %v", spec.key, err)
 		}
 		if id == "" {
@@ -108,6 +109,8 @@ func main() {
 			inserted++
 		}
 	}
+
+	pool.Close()
 
 	fmt.Println("Seed complete")
 	fmt.Println()
